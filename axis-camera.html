@@ -107,60 +107,50 @@
 </script>
 
 <script type="text/x-red" data-help-name="Axis Camera">
-    <p>Node for common VAPIX and ONVIF requests for Axis Device</p>
+    <p>Axis Camera</p>
 	<h3>Outputs</h3>
     <dl class="message-properties">
         <dt>payload<span class="property-type">object | string | number</span></dt>
-        <dd> Depends on the action.</dd>
-        <dt>error<span class="property-type">boolean | number | string</span></dt>
-        <dd> The operation was successful if <code>error</code> is null or false. If the operation failed,
-			msg.payload will include hints on the reason.  If <code>error</code> is a number it will be the 
-			the HTTP resonse code from the Axis device</dd>
+        <dd> Depends on the request/action.</dd>
+        <dt>error<span class="property-type">boolean</span></dt>
+        <dd> The operation was successful if <code>error</code> false. If the operation failed,
+			msg.payload will include hints on the reason.</dd>
     </dl>	
 
 	<h3>Inputs</h3>	
     <dl class="message-properties">
-        <dt>address<span class="property-type">string</span></dt>
-        <dd> IP address for FQDN to camera</dd>
-		
-        <dt>credentials<span class="property-type">object</span></dt>
-        <dd> The device credentials and protocol</dd>
-		
-        <dt>action<span class="property-type">string | Selection</span></dt>
-        <dd> Action type</dd>
-		
-        <dt class="optional">data <span class="property-type">string</span></dt>
+        <dt >payload <span class="property-type">string | object</span></dt>
         <dd> Depends on request/action type</dd>
 		
-        <dt>output<span class="property-type">string</span></dt>
-        <dd> Output data type for Actions <code>Image</code> and <code>HTTP Request</code>.  Other actions will reply a JavaScript object</dd>
+        <dt>address<span class="property-type">string</span></dt>
+        <dd> IP address or FQDN to camera.  May be overridden with msg.address</dd>
+		
+        <dt>credentials<span class="property-type">object</span></dt>
+        <dd> The camera credentials and protocol</dd>
+		
+        <dt>action<span class="property-type">string</span></dt>
+        <dd> Action type</dd>
+		
+        <dt>Output format<span class="property-type">string</span></dt>
+        <dd> Optional change output format (JSON, binary, Base64).  Only applicable on selected actions such as <code>Image</code> and <code>HTTP Request</code>./dd>
     </dl>	
 	
-	<h3>Request: msg.action</h3>
-    <dl class="message-properties">
-        <dt>action<span class="property-type">string</span></dt>
-        <dd> Action type.</dd>
-        <dt>data<span class="property-type">string</span></dt>
-        <dd> Depends on action type</dd>
-    </dl>	
-
 	<h3>Request: Image</h3>
     <dl class="message-properties">
-        <dt>Data<span class="property-type">string</span></dt>
-        <dd> Image profile. See Axis VAPIX documentation</br>Example: resolution=640x360&text=0</dd>
-		<p><code>msg.payload</code> is a binary buffer.  If data is to be sent to a dashboard HTML tamplate node, convert data to Base64.</p>
+        <dt>payload<span class="property-type">string</span></dt>
+        <dd> See Axis VAPIX documentation</br>Example: resolution=640x360&text=0</dd>
     </dl>	
 
 	<h3>Request: HTTP GET</h3>
     <dl class="message-properties">
-        <dt>data<span class="property-type">string</span></dt>
-        <dd> The query string placed after address.  Query strings my need to be URL encoded</dd>
+        <dt>payload<span class="property-type">string</span></dt>
+        <dd> The request string (e.g. "/local/packages/someACAP?data=1"</dd>
     </dl>	
 	
 	<h3>Request: Get Property</h3>
     <dl class="message-properties">
-        <dt>data<span class="property-type">string</span></dt>
-        <dd> <strong>This field is required.</strong>  This field must be the Axis device parameter group path (without 'root.').</dd>
+        <dt>payload<span class="property-type">string</span></dt>
+        <dd> The camera parameter path (without 'root.').</dd>
 		<p>Examples: <code>network</code> or <code>network.eth0</code></p>
 		<p>Common Groups: audio, brand, image, network, properties, ptz, storage, streamprofile, system, time<br/>
 		<i>See the VAPIX parameter documentation.</i></p>
@@ -168,8 +158,8 @@
 
 	<h3>Request: Set Property</h3>
     <dl class="message-properties">
-        <dt>data<span class="property-type">string</span></dt>
-        <dd> The Axis device parameter group path (without root).  Check VAPIX documentation.</dd>
+        <dt>topic<span class="property-type">string</span></dt>
+        <dd> The Axis parameter group path (without root).  Check VAPIX documentation.</dd>
         <dt>payload<span class="property-type">object</span></dt>
         <dd> An object with the properties to be set.  Note that sub group objects will NOT be passed to the Axis device</dd>
 		<p>See Get Properties</p>
@@ -182,7 +172,7 @@
     <dl class="message-properties">
         <dt>payload<span class="property-type">object</span></dt>
         <dd> The account that will be added or updated</dd>
-		<p>{<br/>&nbsp;&nbsp;account: "account name",<br/>&nbsp;&nbsp;password:"password",<br/>&nbsp;&nbsp;privileges:"Administrator | Operator | Viewer"<br/>}</p>
+		<p>{<br/>&nbsp;&nbsp;user: "theUser",<br/>&nbsp;&nbsp;password:"thePassword",<br/>&nbsp;&nbsp;privileges:"Administrator | Operator | Viewer"<br/>}</p>
     </dl>	
 	
 	<h3>List ACAP</h3>
