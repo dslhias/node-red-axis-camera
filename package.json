@@ -5,15 +5,15 @@
   },
   "bundleDependencies": false,
   "dependencies": {
-    "request": "2.88.0",
-    "xml2js": "0.4.22"
+    "request": "^2.88.0",
+    "xml2js": "^0.4.22"
   },
   "deprecated": false,
   "description": "Axis Camera Node",
   "license": "MIT",
   "node-red": {
     "nodes": {
-      "axis": "axis-camera.js"
+      "axis-camera": "axis-camera.js"
     }
   },
   "scripts": {

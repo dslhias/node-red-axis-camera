@@ -1,11 +1,11 @@
-<script type="text/x-red" data-template-name="device-credentials">
+<script type="text/x-red" data-template-name="Camera Credentials">
     <div class="form-row">
         <label for="node-config-input-name"> Name</label>
         <input type="text" id="node-config-input-name">
     </div>
     <div class="form-row">
-        <label for="node-config-input-username"><i class="icon-tag"></i> User</label>
-        <input type="text" id="node-config-input-username">
+        <label for="node-config-input-user"><i class="icon-tag"></i> User</label>
+        <input type="text" id="node-config-input-user">
     </div>
     <div class="form-row">
         <label for="node-config-input-password"><i class="icon-tag"></i> Password</label>
@@ -21,19 +21,19 @@
 </script>
 
 <script type="text/javascript">
-    RED.nodes.registerType('device-credentials',{
+    RED.nodes.registerType('Camera Credentials',{
         category: 'config',
         defaults: {
             name: {value:""},
 			protocol: {value:"http"}
         },
 		credentials: {
-			username: {type:"text"},
+			user: {type:"text"},
 			password: {type:"password"}
 			
         },
         label: function() {
-            return this.name || "Axis Credential";
+            return this.name || "Camera Credential";
         }
     });
 </script>
@@ -44,8 +44,8 @@
         <input type="text" id="node-input-name" placeholder="Name">
     </div>
     <div class="form-row">
-        <label for="node-input-account"><i class="icon-tag"></i> Account</label>
-        <input type="text" id="node-input-account">
+        <label for="node-input-credentials"><i class="icon-tag"></i> Credentials</label>
+        <input type="text" id="node-input-credentials">
     </div>
     <div class="form-row">
         <label for="node-input-address"><i class="icon-tag"></i> Address</label>
@@ -54,7 +54,6 @@
     <div class="form-row">
         <label for="node-input-action"><i class="icon-tag"></i> Action</label>
         <select id="node-input-action">
-            <option value="msg.action">msg.action</option>
             <option value="Image">Image</option>
             <option value="HTTP GET">HTTP GET</option>
             <option value="Get Properties">Get Properties</option>
@@ -76,12 +75,9 @@
 		</select>
 	</div>
     <div class="form-row">
-        <label for="node-input-data"><i class="icon-tag"></i> Data</label>
-        <input type="text" id="node-input-data"  placeholder="Depends on action">
-    </div>
-    <div class="form-row">
-        <label for="node-input-output"><i class="icon-tag"></i> Output</label>
-        <select id="node-input-output">
+        <label for="node-input-format"><i class="icon-tag"></i> Output Format</label>
+        <select id="node-input-format">
+            <option value="default">Default</option>
             <option value="string">UTF-8 String</option>
             <option value="json">Parse JSON</option>
             <option value="binary">Binary buffer</option>
@@ -91,27 +87,26 @@
 </script>
 
 <script type="text/javascript">
-    RED.nodes.registerType('device',{
+    RED.nodes.registerType('Axis Camera',{
         category: 'Axis',
         color: '#FFFF00',
         defaults: {
             name: {value:""},
-			account: {value:"", type:"device-credentials"},
+			credentials: {value:"", type:"Camera Credentials"},
 			address: {value:""},
-			action: { value:"msg_action", required: true },
-			data: {value:""},
-			output: {value:"json"}
+			action: { value:"Image", required: true },
+			format: {value:"default"}
         },
         inputs:1,
         outputs:1,
         icon: "file.png",
         label: function() {
-            return this.name|| this.action;
+            return this.name || this.action;
         }
     });
 </script>
 
-<script type="text/x-red" data-help-name="device">
+<script type="text/x-red" data-help-name="Axis Camera">
     <p>Node for common VAPIX and ONVIF requests for Axis Device</p>
 	<h3>Outputs</h3>
     <dl class="message-properties">

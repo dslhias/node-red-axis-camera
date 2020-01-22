@@ -4,222 +4,208 @@ var vapix = require('./vapix.js');
 module.exports = function(RED) {
     function AxisDevice(config) {
         RED.nodes.createNode(this,config);
-		this.account = config.account;
+		this.credentials = config.credentials;
 		this.address = config.address;
 		this.action = config.action;
-		this.protocol = config.protocol;
-		this.data = config.data;
-		this.output = config.output;
+		this.format = config.format;
+		
         var node = this;
         node.on('input', function(msg) {
-			var address = msg.address || node.address;
-			var action = msg.action || node.action;
-			var account = RED.nodes.getNode(this.account);
-			var user = msg.user || account.credentials.username;
-			var password = msg.password || account.credentials.password;
-			var data = msg.data || node.data;
-			var protocol = account.protocol;
-			if( address.length < 6 ) {
-				msg.error = "Invalid address";
-				msg.payload = {};
-				node.send(msg);
-				return;
+			var credentials = RED.nodes.getNode(this.credentials);
+			this.camera = {
+				url: credentials.protocol + '://' + msg.address || node.address,
+				user: credentials.credentials.user,
+				password: credentials.credentials.password
 			}
-			//console.log(action + ":" + address + "/" + data);
+			var format = node.format;
+			var action = msg.action || node.action;
 			switch( action ) {
 				case "Image":
 					var mediaProfile = data;
-					vapix.image( protocol + '://' + address, user, password, mediaProfile, function(error,response ) {
+					vapix.image( camera, msg.payload, function(error,response ) {
 						if( error ) {
 							msg.error = true;
 							msg.payload = response.toString();
-						} else{
-							msg.error = false;
-							if( node.output === "base64" )
-								msg.payload = response.toString('base64');
-							else
-								msg.payload = response;
+							node.send(msg);
+							return;
 						}
+						msg.error = false;
+						if( format === "base64" )
+							msg.payload = response.toString('base64');
 						node.send(msg);
 					});
 				break;
 				
 				case "HTTP GET":
-					var options = {
-						url: protocol + '://' + address + '/' + data,
-						strictSSL: false
-					}
-					//console.log(options);
-					if( node.output === "binary" || node.output === "base64" )
+					var options = {url: camera.url + msg.payload, strictSSL: false}
+					if( format === "binary" || format === "base64" )
 						options.encoding = null;
 					request.get(options, function (error, response, body) {
-						//console.log("Response Error: " + error );
-						msg.topic = options.url;
 						if( error ) {
 							msg.error = true;
 							msg.payload = body.toString();
+							node.send(msg);
 							return;
 						}
 						if( response.statusCode !== 200 ) {
-							//console.log("Response Error: " + response.statusCode );
 							msg.error = true;
 							msg.payload = body.toString();
+							node.send(msg);
 							return;
 						}
-						//console.log("Parsing");
 						msg.payload = body;
-						if( node.output === "base64")
+						if( format === "base64")
 							msg.payload = body.toString('base64');
-						if( node.output === "json" ) {
+						if( format === "json" ) {
 							msg.payload = JSON.parse(body);
 							if( !msg.payload ) {
 								msg.error = true;
 								msg.payload = "Error parsing resonse as JSON";
 							}
 						}
-						//console.log("Send");
 						node.send(msg);
-					}).auth( user, password, false);
+					}).auth( camera.user, camera.password, false);
 				break;
 				
 				case "Get Properties":
-					//console.log("Get properties: Request" );
-					vapix.getParam( protocol + '://' + address, user, password, data, function( error, response ) {
-						//console.log("Get properties: Response" );
+					vapix.getParam( camera, msg.payload, function( error, response ) {
+						msg.error = false;
 						msg.payload = response;
 						if( error )
-							msg.error = error;
+							msg.error = true;
 						else
-							msg.error = false;
-						msg.topic = data;
 						node.send( msg );
 					});
 				break;
 				
 				case "Set Properties":
-					vapix.setParam( protocol + '://' + address, user, password, data, msg.payload, function(error, response ){
+					vapix.setParam( camera, msg.payload, function(error, response ){
+						msg.error = false;
 						msg.payload = response;
 						if( error )
-							msg.error = error;
-						else
-							msg.error = false;
+							msg.error = true;
 						node.send( msg );
 					});
 				break;
 
 				case "List Connections":
-					vapix.request( protocol + '://' + address + '/axis-cgi/admin/connection_list.cgi?action=get', user, password, function(error,response ) {
+					vapix.request( camera, '/axis-cgi/admin/connection_list.cgi?action=get', function(error,response ) {
+						msg.error = false;
 						if( error ) {
 							msg.error = true;
 							msg.payload = response;
-						} else {
-							msg.error = false;
-							var rows = response.split('\n');
-							var list = [];
-							for( var i = 1; i < rows.length; i++) {
-								var row = rows[i].trim();
-								row = row.replace(/\s{2,}/g, ' ');
-								if( row.length > 10 ) {
-									var items = row.split(' ');
-									var ip = items[0].split('.');
-									if( ip != '127' ) {
-										list.push({
-											address: items[0],
-											protocol: items[1],
-											port: items[2],
-											service: items[3].split('/')[1]
-										})
-									}
+							node.send(msg);
+							return;
+						}
+						var rows = response.split('\n');
+						var list = [];
+						for( var i = 1; i < rows.length; i++) {
+							var row = rows[i].trim();
+							row = row.replace(/\s{2,}/g, ' ');
+							if( row.length > 10 ) {
+								var items = row.split(' ');
+								var ip = items[0].split('.');
+								if( ip != '127' ) {
+									list.push({
+										address: items[0],
+										protocol: items[1],
+										port: items[2],
+										service: items[3].split('/')[1]
+									})
 								}
 							}
-							msg.payload = list;
 						}
+						msg.payload = list;
 						node.send(msg);
 					});
 				break;
 				
 				case 'List Events':
-					vapix.listEvents( protocol + '://' + address, user, password, function( error, response ) {
-						if( error )
+					vapix.listEvents( camera, function( error, response ) {
+						msg.error = false;
+						if( error ) {
 							msg.error = true;
-						else	
-							msg.error = false;
+							msg.payload = response;
+							node.send(msg);
+							return;
+						}
 						msg.payload = response;
 						node.send(msg);
 					});
 				break;
 				
 				case 'List ACAP':
-					vapix.listACAP( protocol + '://' + address, user, password, function(error, response ) {
+					vapix.listACAP( camera, function(error, response ) {
+						msg.error = false;
 						msg.payload = response;
 						if( error )
-							msg.error = error;
+							msg.error = true;
 						else
-							msg.error = false;
 						node.send( msg );
 					});
 				break;
 
 				case 'Start ACAP':
-					vapix.controlACAP( protocol + '://' + address, user, password, "start", data,  function(error, response ) {
+					vapix.controlACAP( camera, "start", data,  function(error, response ) {
 						msg.payload = response;
-						if( error )
-							msg.error = error;
-						else
-							msg.error = false;
+						msg.error = false;
+						if( error ) {
+							msg.error = true;
+							msg.payload = error;
+						}
 						node.send( msg );
 					});
 				break;
 				case 'Stop ACAP':
-					vapix.controlACAP( protocol + '://' + address, user, password, "stop", data,  function(error, response ) {
+					vapix.controlACAP( camera, "stop", data,  function(error, response ) {
 						msg.payload = response;
-						if( error )
-							msg.error = error;
-						else
-							msg.error = false;
+						msg.error = false;
+						if( error ) {
+							msg.error = true;
+							msg.payload = error;
+						}
 						node.send( msg );
 					});
 				break;
 				case 'Remove ACAP':
-					vapix.controlACAP( protocol + '://' + address, user, password, "remove", data,  function(error, response ) {
+					vapix.controlACAP( camera, "remove", data,  function(error, response ) {
 						msg.payload = response;
-						if( error )
-							msg.error = error;
-						else
-							msg.error = false;
+						msg.error = false;
+						if( error ) {
+							msg.error = true;
+							msg.payload = error;
+						}
 						node.send( msg );
 					});
 				break;
 
 				case 'Install ACAP':
-					//console.log("Installing ACAP " + data );
 					node.status({fill:"blue",shape:"dot",text:"Installing..."});
-					vapix.installACAP( protocol + '://' +  address, user, password, data, function(error, response ) {
+					vapix.installACAP( camera , msg.payload, function(error, response ) {
 						msg.payload = response;
+						msg.error = false;
 						if( error ) {
 							node.status({fill:"red",shape:"dot",text:"Failed"});
 							msg.error = error;
 						} else {
 							node.status({fill:"green",shape:"dot",text:"Success"});
-							msg.error = false;
 						}
 						node.send( msg );
 					});
 				break;
 				
 				case "List Accounts":
-					vapix.listAccounts( protocol + '://' + address, user, password, function(error, response ) {
+					vapix.listAccounts( camera, function(error, response ) {
 						msg.payload = response;
+						msg.error = false;
 						if( error )
-							msg.error = error;
-						else
-							msg.error = false;
+							msg.error = true;
 						node.send( msg );
 					});
 				break;
 
 				case "Set Account":
-					vapix.setAccount(  protocol + '://' + address, user, password, msg.payload, function(error,response) {
+					vapix.setAccount( camera, msg.payload, function(error,response) {
 						msg.error = false;
 						msg.payload = response;
 						if( error )
@@ -229,18 +215,18 @@ module.exports = function(RED) {
 				break;
 				
 				case "List Certificates":
-					vapix.listCertificates(  protocol + '://' + address, user, password, function(error, response ) {
+					vapix.listCertificates( camera, user, password, function(error, response ) {
+						msg.error = false;
 						if( error )
 							msg.error = true;
 						else	
-							msg.error = false;
 						msg.payload = response
 						node.send(msg);
 					});
 				break;
 				
 				case "Create Certificate":
-					vapix.createCertificate( protocol + '://' + address, user, password, data, msg.payload, function(error, response) {
+					vapix.createCertificate( camera, msg.payload, function(error, response) {
 						if( error )
 							msg.error = true;
 						else	
@@ -251,7 +237,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Request CSR":
-					vapix.requestCSR( protocol + '://' + address, user, password, data, msg.payload, function(error, response) {
+					vapix.requestCSR( camera, msg.payload, function(error, response) {
 						if( error )
 							msg.error = true;
 						else	
@@ -262,7 +248,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Restart":
-					vapix.request(protocol + '://' + address + '/axis-cgi/restart.cgi', user, password, function(error,response ) {
+					vapix.request(camera, '/axis-cgi/restart.cgi', function(error,response ) {
 						if( error )
 							msg.error = true;
 						else	
@@ -345,30 +331,30 @@ module.exports = function(RED) {
         });
     }
 	
-    RED.nodes.registerType("device",AxisDevice,{
+    RED.nodes.registerType("Axis Camera",AxisDevice,{
 		defaults: {
             name: {type:"text"},
-			account: {type:"device-credentials"},
+			credentials: {type:"Camera Credentials"},
 			address: {type:"text"},
 			action: { type:"text" },
 			data: {type:"text"},
-			output: { type: "default"}
+			format: { type: "text"}
 		}		
 	});
 	
-	function Axis_Device_Credentials(config) {
+	function Axis_Camera_Credentials(config) {
 			RED.nodes.createNode(this,config);
 			this.name = config.name;
 			this.protocol = config.protocol;
 	}
 	
-	RED.nodes.registerType("device-credentials",Axis_Device_Credentials,{
+	RED.nodes.registerType("Camera Credentials",Axis_Camera_Credentials,{
 		defaults: {
             name: {type:""},
 			protocol: {type:"text"}
 		},
 		credentials: {
-			username: {type:"text"},
+			user: {type:"text"},
 			password: {type:"password"}
 		}		
 	});
