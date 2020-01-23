@@ -4,8 +4,8 @@ var xml2js = require('xml2js');
 
 var exports = module.exports = {};
 
-exports.request = function( address, user, password, callback ) {
-	request.get({url:address,strictSSL: false}, function (error, response, body) {
+exports.request = function( camera, path,callback ) {
+	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "VAPIX Request failed");
 			return;
@@ -19,11 +19,11 @@ exports.request = function( address, user, password, callback ) {
 			return;
 		}
 		callback( null, body );
-	}).auth( user, password, false);
+	}).auth( camera.user, camera.password, false);
 }
 
-exports.post = function( address, data, user, password, callback ) {
-	request.post({url: address,body: data,strictSSL: false}, function (error, response, body) {
+exports.post = function( camera, path, data, callback ) {
+	request.post({url: camera.url+path,body: data,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "VAPIX Post failed" );
 			return;
@@ -40,7 +40,7 @@ exports.post = function( address, data, user, password, callback ) {
 	}).auth(user, password, false);
 }
 
-exports.soap = function( address, user, password, soapBody, callback ) {
+exports.soap = function( camera, soapBody, callback ) {
 	var soapEnvelope = '<SOAP-ENV:Envelope ' +
 					   'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '+
 					   'xmlns:xsd="http://www.w3.org/2001/XMLSchema" '+
@@ -54,13 +54,10 @@ exports.soap = function( address, user, password, soapBody, callback ) {
 					   'xmlns:aev="http://www.axis.com/vapix/ws/event1" ' +
 					   'xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">';
 					   
-//						 xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2" 
-					   
-					   
 	soapEnvelope += '<SOAP-ENV:Body>' + soapBody + '</SOAP-ENV:Body>';
 	soapEnvelope += '</SOAP-ENV:Envelope>';
-	var url = address + '/vapix/services';
-	request.post({url: url,body: soapEnvelope,strictSSL: false}, function (error, response, body) {
+	
+	request.post({url: camera.url+path,body: soapEnvelope,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "Soap request error" );
 			return;
@@ -88,15 +85,14 @@ exports.soap = function( address, user, password, soapBody, callback ) {
 				callback(true,result);
 			}
 		)
-	}).auth(user, password, false);
+	}).auth(camera.user, camera.password, false);
 }
 
-exports.image = function( address, user, password, mediaProfil, callback ) {
-	url = address + '/axis-cgi/jpg/image.cgi';
+exports.image = function( camera, mediaProfil, callback ) {
+	path = '/axis-cgi/jpg/image.cgi';
 	if( mediaProfil && mediaProfil.length > 3 )
-		url += '?' + mediaProfil;
-	
-	request.get({url:url,encoding:null,strictSSL: false}, function (error, response, body) {
+		path += '?' + mediaProfil;
+	request.get({url:camera.url+path,encoding:null,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, body);
 			return;
@@ -106,16 +102,16 @@ exports.image = function( address, user, password, mediaProfil, callback ) {
 			return;
 		}
 		callback( null, body );
-	}).auth( user, password, false);
+	}).auth( camera.user, camera.password, false);
 }
 
-exports.getParam = function( address, user, password, paramPath, callback ) {
+exports.getParam = function( camera, paramPath, callback ) {
 	if( !paramPath || paramPath.length === 0 || paramPath.toLowerCase ( ) === "root" ) {
 		callback(true,"Invalid parameter path.  Set data to a valid parameter group" );
 		return;
 	}
-	var url = address + '/axis-cgi/param.cgi?action=list&group=' + paramPath
-	request.get({url:url,strictSSL: false}, function (error, response, body) {
+	var path = '/axis-cgi/param.cgi?action=list&group=' + paramPath
+	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "VAPIX Parameter Request failed");
 			return;
@@ -130,7 +126,7 @@ exports.getParam = function( address, user, password, paramPath, callback ) {
 		}
 		var params = ParseVapixParameter(body);
 		callback( null, params );
-	}).auth( user, password, false);
+	}).auth( camera.user, camera.password, false);
 }
 
 function ParseVapixParameter( data ) {
@@ -167,7 +163,7 @@ function ParseVapixParameter( data ) {
 	return result;
 }
 
-exports.setParam = function( address, user, password, group, parameters, callback ) {
+exports.setParam = function( camera, group, parameters, callback ) {
 	if( !group || group.length == 0 ) {
 		callback( true, "Undefined property group");
 		return;
@@ -177,7 +173,6 @@ exports.setParam = function( address, user, password, group, parameters, callbac
 		callback( true, "Input is not a valid object");
 		return;
 	}
-	var url = address + '/axis-cgi/param.cgi?action=update';
 	for( var parameter in parameters ) {
 		var value = parameters[parameter];
 		if( value === true )
@@ -187,10 +182,11 @@ exports.setParam = function( address, user, password, group, parameters, callbac
 		if(  typeof parameters[parameter] === 'object' ) {
 			//Don't update sub groups 
 		} else {
-			url += '&root.' + group + '.' + parameter + '=' + encodeURIComponent(value);
+			path += '&root.' + group + '.' + parameter + '=' + encodeURIComponent(value);
 		}
 	}
-	request.get({url:url,strictSSL: false}, function (error, response, body) {
+	var path = '/axis-cgi/param.cgi?action=update';
+	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "Request error: " + body);
 			return;
@@ -203,12 +199,12 @@ exports.setParam = function( address, user, password, group, parameters, callbac
 			callback( null, "OK");
 		else
 			callback( true, body);
-	}).auth(user, password, false);
+	}).auth(camera.user, camera.password, false);
 }
 
-exports.listACAP = function( address, user, password, callback ) {
-	var url =  address + '/axis-cgi/applications/list.cgi';
-	request.get({url:url,strictSSL: false}, function (error, response, body) {
+exports.listACAP = function( camera, callback ) {
+	var path =  '/axis-cgi/applications/list.cgi';
+	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "Request error: " + body);
 			return;
@@ -242,18 +238,13 @@ exports.listACAP = function( address, user, password, callback ) {
 			}
 			callback(null,data.application);
 		});
-	}).auth(user, password, false);
+	}).auth(camera.user, camera.password, false);
 }
 
-exports.installACAP = function( address, user, password, filepath, callback ) {
-	var url = address + '/axis-cgi/applications/upload.cgi'
+exports.installACAP = function( camera, filepath, callback ) {
+	var path = '/axis-cgi/applications/upload.cgi'
 //	var url = address + '/axis-cgi/packagemanager.cgi'
-	console.log(url);
-	console.log(filepath);
-	var req = request.post( {url:url,strictSSL: false},function (error, response, body) {
-		console.log(error);
-		console.log(response);
-		console.log(body);
+	var req = request.post( {url:camera.url+path,strictSSL: false},function (error, response, body) {
 		body = body?body.trim():"";
 		if( error ) {
 			callback( error, body );
@@ -284,18 +275,12 @@ exports.installACAP = function( address, user, password, filepath, callback ) {
 				callback( true, body );
 			break;
 		}
-	}).auth(user, password, false);
+	}).auth(camera.user, camera.password, false);
 	var form = req.form();
 	form.append('file',fs.createReadStream(filepath));
-/*	
-	form.append('file', fileData, {
-		filename: 'acap.eap',
-		contentType: 'application/octet-stream'
-	});	
-*/
 }
 
-exports.controlACAP = function( address, user, password, action, acap, callback ) {
+exports.controlACAP = function( camera, action, acap, callback ) {
 	if( !action || action.length == 0 ) {
 		callback( true, "Invalid ACAP action");
 		return;
@@ -306,8 +291,8 @@ exports.controlACAP = function( address, user, password, action, acap, callback 
 		return;
 	}
 	
-	var url =  address + '/axis-cgi/applications/control.cgi?action=' + action + '&package=' + acap;
-	request.get({url:url,strictSSL: false}, function (error, response, body) {
+	var path =  '/axis-cgi/applications/control.cgi?action=' + action + '&package=' + acap;
+	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "Request error");
 			return;
@@ -330,12 +315,12 @@ exports.controlACAP = function( address, user, password, action, acap, callback 
 				callback( true, body );
 			break;
 		}
-	}).auth(user, password, false);
+	}).auth(camera.user, camera.password, false);
 }
 
-exports.listAccounts = function( address, user, password, callback ) {
- 	var url =  address + '/axis-cgi/pwdgrp.cgi?action=get';
-	request.get({url:url,strictSSL: false}, function (error, response, body) {
+exports.listAccounts = function( camera, callback ) {
+ 	var path =  '/axis-cgi/pwdgrp.cgi?action=get';
+	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "Request error");
 			return;
@@ -387,12 +372,12 @@ exports.listAccounts = function( address, user, password, callback ) {
 			})    
 		})
 		callback( null, list );
-	}).auth(user, password, false);
+	}).auth(camera.user, camera.password, false);
 }
 
-exports.setAccount = function( address, user, password, account, callback ) {
-	if( !account || !account.hasOwnProperty('account') || account.account.length < 3 ) {
-		callback(true,"Invalid or missing account name");
+exports.setAccount = function( camera, account, callback ) {
+	if( !account || !account.hasOwnProperty('user') || account.account.length < 3 ) {
+		callback(true,"Invalid or missing user name");
 		return;
 	}
 	if( !account.hasOwnProperty('password') || account.password.length < 6 ) {
@@ -404,16 +389,16 @@ exports.setAccount = function( address, user, password, account, callback ) {
 		return;
 	}
 	
-	var url = address + '/axis-cgi/pwdgrp.cgi?action=update&user=' + account.account + '&pwd=' + encodeURIComponent(account.password);
-	exports.request( url, user, password, function( error, response ) {	
+	var path = '/axis-cgi/pwdgrp.cgi?action=update&user=' + account.user + '&pwd=' + encodeURIComponent(account.password);
+	exports.request( camera,path, function( error, response ) {	
 		if( error ) {
 			var sgrp = "viewer";
 			if( account.privileges==="Operator" )
 				sgrp += ":operator:ptz";
 			if( account.privileges==="Administrator" )
 				sgrp += ":operator:admin:ptz";
-			url = address + '/axis-cgi/pwdgrp.cgi?action=add&user=' + account.account + '&pwd=' + encodeURIComponent(account.password) + '&grp=users&sgrp=' + sgrp + '&comment=node';
-			exports.request( url, user, password, function( error, response ) {	
+			path = '/axis-cgi/pwdgrp.cgi?action=add&user=' + account.user + '&pwd=' + encodeURIComponent(account.password) + '&grp=users&sgrp=' + sgrp + '&comment=node';
+			exports.request( camera,path, function( error, response ) {	
 				if( error ) {
 					callback( error, response );
 					return;
@@ -426,9 +411,9 @@ exports.setAccount = function( address, user, password, account, callback ) {
 	});
 }
 
-exports.listCertificates = function( address, user, password, callback ) {
+exports.listCertificates = function( camera, callback ) {
 	var soapBody = '<tds:GetCertificates xmlns="http://www.onvif.org/ver10/device/wsdl"></tds:GetCertificates>';
-	exports.soap( address, user, password, soapBody, function( error, response ) {
+	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
 			callback( error, response );
 			return;
@@ -462,7 +447,7 @@ exports.listCertificates = function( address, user, password, callback ) {
 	});
 };
 
-exports.createCertificate = function( address, user, password, id, certificate, callback ) {
+exports.createCertificate = function( camera, id, certificate, callback ) {
 	if( id.length < 4 ) {
 		callback( true,"Invalid certificate id");
 		return;
@@ -479,7 +464,7 @@ exports.createCertificate = function( address, user, password, id, certificate, 
 	if( certificate.hasOwnProperty('organizationalUnitName')) soapBody += '<acert:OU>' + certificate.organizationalUnitName + '</acert:OU>';
 	if( certificate.hasOwnProperty('stateOrProvinceName')) soapBody += '<acert:ST>' + certificate.stateOrProvinceName + '</acert:ST>';
 	soapBody +=	'</acertificates:Subject></acertificates:CreateCertificate2>';
-	exports.soap( address, user, password, soapBody, function( error, response ) {
+	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
 			callback(error, response);
 			return;
@@ -499,7 +484,7 @@ exports.createCertificate = function( address, user, password, id, certificate, 
 	});
 }
 
-exports.requestCSR = function( address, user, password, id, certificate, callback ) {
+exports.requestCSR = function( camera, id, certificate, callback ) {
 	if( id.length < 4 ) {
 		callback( true,"Invalid certificate id");
 		return;
@@ -516,7 +501,7 @@ exports.requestCSR = function( address, user, password, id, certificate, callbac
 	if( certificate.hasOwnProperty('organizationalUnitName')) soapBody += '<acert:OU>' + certificate.organizationalUnitName + '</acert:OU>';
 	if( certificate.hasOwnProperty('stateOrProvinceName')) soapBody += '<acert:ST>' + certificate.stateOrProvinceName + '</acert:ST>';
 	soapBody +=	'</acertificates:Subject></acertificates:Subject></acertificates:GetPkcs10Request2>';
-	exports.soap( address, user, password, soapBody, function( error, response ) {
+	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
 			callback(error, response);
 			return;
@@ -559,9 +544,9 @@ function parseSOAPResponse( xml, success, failure ) {
 	});
 }
 
-exports.listEvents = function( address, user, password, callback ) {
+exports.listEvents = function( camera, callback ) {
 	var soapBody = '<aev:GetEventInstances xmlns="http://www.axis.com/vapix/ws/event1"></aev:GetEventInstances>';
-	exports.soap( address, user, password, soapBody, function(error, response ) {
+	exports.soap( camera, soapBody, function(error, response ) {
 		if( error ) {
 			callback(error,response);
 			return;

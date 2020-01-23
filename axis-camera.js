@@ -2,26 +2,46 @@ var request = require('request');
 var vapix = require('./vapix.js');
 
 module.exports = function(RED) {
-    function AxisDevice(config) {
+	function Axis_Camera_Account(config) {
+		RED.nodes.createNode(this,config);
+		this.name = config.name;
+		this.protocol = config.protocol;
+	}
+	
+	RED.nodes.registerType("Camera Account",Axis_Camera_Account,{
+		defaults: {
+            name: {type:""},
+			protocol: {type:"text"}
+		},
+		credentials: {
+			user: {type:"text"},
+			password: {type:"password"}
+		}		
+	});
+	
+    function Axis_Camera_Node(config) {
         RED.nodes.createNode(this,config);
-		this.credentials = config.credentials;
+		this.account = config.account;
 		this.address = config.address;
 		this.action = config.action;
 		this.format = config.format;
-		
         var node = this;
         node.on('input', function(msg) {
-			var credentials = RED.nodes.getNode(this.credentials);
-			this.camera = {
-				url: credentials.protocol + '://' + msg.address || node.address,
-				user: credentials.credentials.user,
-				password: credentials.credentials.password
+			var account = RED.nodes.getNode(node.account);
+			var address = msg.address || node.address;
+			var camera = {
+				url: account.protocol + '://' + address,
+				user: account.credentials.user,
+				password: account.credentials.password
 			}
 			var format = node.format;
 			var action = msg.action || node.action;
+			console.log("Input");
+			console.log(msg.topic);
+			console.log(msg.payload);
+			console.log(action);
 			switch( action ) {
 				case "Image":
-					var mediaProfile = data;
 					vapix.image( camera, msg.payload, function(error,response ) {
 						if( error ) {
 							msg.error = true;
@@ -30,6 +50,7 @@ module.exports = function(RED) {
 							return;
 						}
 						msg.error = false;
+						msg.payload = response;
 						if( format === "base64" )
 							msg.payload = response.toString('base64');
 						node.send(msg);
@@ -79,7 +100,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Set Properties":
-					vapix.setParam( camera, msg.payload, function(error, response ){
+					vapix.setParam( camera, msg.topic, msg.payload, function(error, response ){
 						msg.error = false;
 						msg.payload = response;
 						if( error )
@@ -146,7 +167,7 @@ module.exports = function(RED) {
 				break;
 
 				case 'Start ACAP':
-					vapix.controlACAP( camera, "start", data,  function(error, response ) {
+					vapix.controlACAP( camera, "start", msg.payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
 						if( error ) {
@@ -157,7 +178,7 @@ module.exports = function(RED) {
 					});
 				break;
 				case 'Stop ACAP':
-					vapix.controlACAP( camera, "stop", data,  function(error, response ) {
+					vapix.controlACAP( camera, "stop", msg.payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
 						if( error ) {
@@ -168,7 +189,7 @@ module.exports = function(RED) {
 					});
 				break;
 				case 'Remove ACAP':
-					vapix.controlACAP( camera, "remove", data,  function(error, response ) {
+					vapix.controlACAP( camera, "remove", msg.payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
 						if( error ) {
@@ -215,7 +236,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "List Certificates":
-					vapix.listCertificates( camera, user, password, function(error, response ) {
+					vapix.listCertificates( camera, function(error, response ) {
 						msg.error = false;
 						if( error )
 							msg.error = true;
@@ -259,7 +280,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Remote Syslog":
-					vapix.request(protocol + '://' + address + '/axis-cgi/param.cgi?action=update&root.system.editcgi=yes', user, password, function(error,response ) {
+					vapix.request(camera + '/axis-cgi/param.cgi?action=update&root.system.editcgi=yes', user, password, function(error,response ) {
 						if( error ) {
 							msg.error = true;
 							node.send(response);
@@ -275,7 +296,7 @@ module.exports = function(RED) {
 						body += '&mode=0100644';
 						body += '&convert_crlf_to_lf=on';
 						body += '&content=';
-						body += '#Added by node-red-axis syslog config\n';
+						body += '#Added by node-red-axis-camera syslog config\n';
 						if( !msg.payload || msg.payload === null || msg.payload === false ) {
 							body += '#Remote syslog is disabled\n';
 						} else {
@@ -307,7 +328,7 @@ module.exports = function(RED) {
 							if( msg.payload.access )
 								body += 'log { source(s_system); filter(f_auth); destination(d_remote-syslog); };\n';
 						}
-						vapix.post(protocol + '://' + address + '/admin-bin/editcgi.cgi?file=/etc/syslog-ng.d/remote.conf', body, user, password, function(error,response ) {
+						vapix.post(camera, '/admin-bin/editcgi.cgi?file=/etc/syslog-ng.d/remote.conf', body, function(error,response ) {
 							if( error ) {
 								msg.error = true;
 								msg.payload = response;
@@ -316,7 +337,7 @@ module.exports = function(RED) {
 							msg.error = false;
 							msg.payload = "OK";
 							node.send(msg);
-							vapix.request(protocol + '://' + address + '/axis-cgi/param.cgi?action=update&root.system.editcgi=no', user, password, function(error,response ) {});
+							vapix.request(camera, '/axis-cgi/param.cgi?action=update&root.system.editcgi=no', user, password, function(error,response ) {});
 						});
 					});
 				break;
@@ -331,31 +352,13 @@ module.exports = function(RED) {
         });
     }
 	
-    RED.nodes.registerType("Axis Camera",AxisDevice,{
+    RED.nodes.registerType("Axis Camera",Axis_Camera_Node,{
 		defaults: {
             name: {type:"text"},
-			credentials: {type:"Camera Credentials"},
+			account: {type:"Camera Account"},
 			address: {type:"text"},
 			action: { type:"text" },
-			data: {type:"text"},
 			format: { type: "text"}
-		}		
-	});
-	
-	function Axis_Camera_Credentials(config) {
-			RED.nodes.createNode(this,config);
-			this.name = config.name;
-			this.protocol = config.protocol;
-	}
-	
-	RED.nodes.registerType("Camera Credentials",Axis_Camera_Credentials,{
-		defaults: {
-            name: {type:""},
-			protocol: {type:"text"}
-		},
-		credentials: {
-			user: {type:"text"},
-			password: {type:"password"}
 		}		
 	});
 }
