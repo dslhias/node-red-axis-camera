@@ -18,7 +18,7 @@ exports.request = function( camera, path,callback ) {
 			callback( true, body);
 			return;
 		}
-		callback( null, body );
+		callback( false, body );
 	}).auth( camera.user, camera.password, false);
 }
 
@@ -57,7 +57,7 @@ exports.soap = function( camera, soapBody, callback ) {
 	soapEnvelope += '<SOAP-ENV:Body>' + soapBody + '</SOAP-ENV:Body>';
 	soapEnvelope += '</SOAP-ENV:Envelope>';
 	
-	request.post({url: camera.url+path,body: soapEnvelope,strictSSL: false}, function (error, response, body) {
+	request.post({url: camera.url+'/vapix/services',body: soapEnvelope,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "Soap request error" );
 			return;
@@ -125,7 +125,7 @@ exports.getParam = function( camera, paramPath, callback ) {
 			return;
 		}
 		var params = ParseVapixParameter(body);
-		callback( null, params );
+		callback( false, params );
 	}).auth( camera.user, camera.password, false);
 }
 
@@ -160,6 +160,7 @@ function ParseVapixParameter( data ) {
 			}
 		}
 	});
+	
 	return result;
 }
 
@@ -173,6 +174,7 @@ exports.setParam = function( camera, group, parameters, callback ) {
 		callback( true, "Input is not a valid object");
 		return;
 	}
+	var path = '/axis-cgi/param.cgi?action=update';
 	for( var parameter in parameters ) {
 		var value = parameters[parameter];
 		if( value === true )
@@ -185,7 +187,6 @@ exports.setParam = function( camera, group, parameters, callback ) {
 			path += '&root.' + group + '.' + parameter + '=' + encodeURIComponent(value);
 		}
 	}
-	var path = '/axis-cgi/param.cgi?action=update';
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( error, "Request error: " + body);
@@ -196,7 +197,7 @@ exports.setParam = function( camera, group, parameters, callback ) {
 			return;
 		}
 		if( body.search("Error") === -1 )
-			callback( null, "OK");
+			callback( false, "OK");
 		else
 			callback( true, body);
 	}).auth(camera.user, camera.password, false);
@@ -279,6 +280,27 @@ exports.installACAP = function( camera, filepath, callback ) {
 	var form = req.form();
 	form.append('file',fs.createReadStream(filepath));
 }
+
+exports.updateFimrware = function( camera, filepath, callback ) {
+//	var path = '/axis-cgi/firmwaremanagement.cgi'
+	var path = '/axis-cgi/firmwareupgrade.cgi'
+//	var url = address + '/axis-cgi/packagemanager.cgi'
+	var req = request.post( {url:camera.url+path,strictSSL: false},function (error, response, body) {
+		body = body?body.trim():"";
+		if( error ) {
+			callback( error, body );
+			return;
+		}
+		if( response.statusCode !== 200 ) {
+			callback( true, body );
+			return;
+		}
+		callback( false, body );
+	}).auth(camera.user, camera.password, false);
+	var form = req.form();
+	form.append('file',fs.createReadStream(filepath));
+}
+
 
 exports.controlACAP = function( camera, action, acap, callback ) {
 	if( !action || action.length == 0 ) {
@@ -371,12 +393,12 @@ exports.listAccounts = function( camera, callback ) {
 				privileges: privileges
 			})    
 		})
-		callback( null, list );
+		callback( false, list );
 	}).auth(camera.user, camera.password, false);
 }
 
 exports.setAccount = function( camera, account, callback ) {
-	if( !account || !account.hasOwnProperty('user') || account.account.length < 3 ) {
+	if( !account || !account.hasOwnProperty('user') || account.user.length < 3 ) {
 		callback(true,"Invalid or missing user name");
 		return;
 	}
@@ -407,7 +429,7 @@ exports.setAccount = function( camera, account, callback ) {
 			});
 			return;
 		}
-		callback( null, response );
+		callback( false, response );
 	});
 }
 
@@ -440,7 +462,7 @@ exports.listCertificates = function( camera, callback ) {
 					pem: pem
 				});
 			});
-			callback( null, list );
+			callback( false, list );
 			return;
 		}
 		callback(true,"Invalid SOAP response. Missing tds:GetCertificatesResponse");
@@ -477,7 +499,7 @@ exports.createCertificate = function( camera, id, certificate, callback ) {
 				pem += row + '\n'
 			});
 			pem += '-----END CERTIFICATE-----\n';
-			callback( null, pem );
+			callback( false, pem );
 		} else {
 			callback( true, "Unable to parse Certificate PEM from response" );
 		}
@@ -490,7 +512,7 @@ exports.requestCSR = function( camera, id, certificate, callback ) {
 		return;
 	}
 	if( !certificate || !certificate.hasOwnProperty('commonName') ) {
-		callback( true,"Invalid Connon Name");
+		callback( true,"Invalid Common Name");
 		return;
 	}
 	var soapBody = '<acertificates:GetPkcs10Request2 xmlns="http://www.axis.com/vapix/ws/certificates">';
@@ -514,7 +536,7 @@ exports.requestCSR = function( camera, id, certificate, callback ) {
 				pem += row + '\n'
 			});
 			pem += '-----END CERTIFICATE REQUEST-----\n';
-			callback( null, pem );
+			callback( false, pem );
 		} else {
 			callback( true, "Unable to parse Certificate PEM from response" );
 		}

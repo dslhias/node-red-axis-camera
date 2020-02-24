@@ -108,6 +108,26 @@ module.exports = function(RED) {
 						node.send( msg );
 					});
 				break;
+				
+				case "List Accounts":
+					vapix.listAccounts( camera, function(error, response ) {
+						msg.payload = response;
+						msg.error = false;
+						if( error )
+							msg.error = true;
+						node.send( msg );
+					});
+				break;
+
+				case "Set Account":
+					vapix.setAccount( camera, msg.payload, function(error,response) {
+						msg.error = false;
+						msg.payload = response;
+						if( error )
+							msg.error = error;
+						node.send( msg );
+					});
+				break;
 
 				case "List Connections":
 					vapix.request( camera, '/axis-cgi/admin/connection_list.cgi?action=get', function(error,response ) {
@@ -214,26 +234,22 @@ module.exports = function(RED) {
 						node.send( msg );
 					});
 				break;
-				
-				case "List Accounts":
-					vapix.listAccounts( camera, function(error, response ) {
-						msg.payload = response;
-						msg.error = false;
-						if( error )
-							msg.error = true;
-						node.send( msg );
-					});
-				break;
 
-				case "Set Account":
-					vapix.setAccount( camera, msg.payload, function(error,response) {
-						msg.error = false;
+				case 'Firmware Update':
+					node.status({fill:"blue",shape:"dot",text:"Updating..."});
+					vapix.updateFimrware( camera , msg.payload, function(error, response ) {
 						msg.payload = response;
-						if( error )
+						msg.error = false;
+						if( error ) {
+							node.status({fill:"red",shape:"dot",text:"Failed"});
 							msg.error = error;
+						} else {
+							node.status({fill:"green",shape:"dot",text:"Success"});
+						}
 						node.send( msg );
 					});
 				break;
+			
 				
 				case "List Certificates":
 					vapix.listCertificates( camera, function(error, response ) {
@@ -247,7 +263,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Create Certificate":
-					vapix.createCertificate( camera, msg.payload, function(error, response) {
+					vapix.createCertificate( camera, msg.topic, msg.payload, function(error, response) {
 						if( error )
 							msg.error = true;
 						else	
@@ -258,7 +274,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Request CSR":
-					vapix.requestCSR( camera, msg.payload, function(error, response) {
+					vapix.requestCSR( camera, msg.topic, msg.payload, function(error, response) {
 						if( error )
 							msg.error = true;
 						else	

@@ -72,6 +72,7 @@
             <option value="Request CSR">Request CSR</option>
             <option value="List Connections">List Connections</option>
             <option value="Remote Syslog">Remote Syslog</option>
+            <option value="Firmware Update">Fimrware Update</option>
 		</select>
 	</div>
     <div class="form-row">
@@ -166,10 +167,8 @@
 	
 	<h3>Request: Install ACAP</h3>
     <dl class="message-properties">
-        <dt>data<span class="property-type">string | EMPTY</span></dt>
-        <dd> The full file path to the ACAP EAP file stored on host.  If data is set, <code>msg.payload</code> will be ignored</dd>
-        <dt>payload<span class="property-type">buffer</span></dt>
-        <dd> If <code>msg.data</code> is let empty the <code>msg.payload</code> must hold the buffer of the content of the ACAP EAP file.</dd>
+        <dt>payload<span class="property-type">string | EMPTY</span></dt>
+        <dd> The full file path to the ACAP eap-file stored on host.</dd>
     </dl>	
 	<h3>Request: Set Remote Syslog</h3>
 	<p>Connect the device to a remote syslog server.  The device needs to be restarted 
