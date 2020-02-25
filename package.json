@@ -4,6 +4,8 @@
     "name": "Pandos Me"
   },
   "dependencies": {
+    "request": "^2.88.0",
+    "xml2js": "^0.4.22"
   },
   "description": "Axis Camera Node",
   "license": "MIT",
