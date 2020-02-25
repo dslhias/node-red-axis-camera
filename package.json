@@ -7,11 +7,15 @@
   },
   "description": "Axis Camera Node",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pandosme/node-red-axis-camera.git"
+  },
   "node-red": {
     "nodes": {
       "axis-camera": "axis-camera.js"
     }
   },
-  "keywords": [ "Axis", "Camera" ],  
+  "keywords": [ "node-red","Axis", "Camera" ],
   "version": "0.1.0"
 }
