@@ -3,12 +3,8 @@
   "author": {
     "name": "Pandos Me"
   },
-  "bundleDependencies": false,
   "dependencies": {
-    "request": "^2.88.0",
-    "xml2js": "^0.4.22"
   },
-  "deprecated": false,
   "description": "Axis Camera Node",
   "license": "MIT",
   "node-red": {
@@ -16,9 +12,6 @@
       "axis-camera": "axis-camera.js"
     }
   },
-  "keywords": [ "node-red", "Axis", "Camera" ],  
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "keywords": [ "Axis", "Camera" ],  
   "version": "0.1.0"
 }
