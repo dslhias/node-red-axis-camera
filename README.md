@@ -1,6 +1,6 @@
-## Node-Red node for Axis Camera
-The most common VAPIX and ONVIF requests for Axis Devices with a much more simplified parsed response than what Axis device API produces.
-* Get JPEG image
+# node-red-contrib-axis-camera
+An Axis Camera administration node that simplifies the most common VAPIX and SOAP/ONVIF API requests including
+* Get JPEG image snapshot
 * Get/Set properties
 * List/Set user accounts
 * List/Start/Stop/Install ACAP
@@ -10,20 +10,3 @@ The most common VAPIX and ONVIF requests for Axis Devices with a much more simpl
 * Enable remote syslog server
 * Update Firmware
 
-## Installation
-
-Go to the node-red directory
-```
-cd ~/.node-red
-
-or, if using doreme docker instance
-
-cd ~/doreme/nodered
-
-```
-Install package
-```
-npm install pandosme/node-red-axis-camera
-```
-Restart Node-Red
-Refresh your web page to load new nodes in the pallet
