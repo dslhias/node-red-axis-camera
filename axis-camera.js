@@ -36,10 +36,10 @@ module.exports = function(RED) {
 			}
 			var format = node.format;
 			var action = msg.action || node.action;
-			console.log("Input");
-			console.log(msg.topic);
-			console.log(msg.payload);
-			console.log(action);
+//			console.log("Input");
+//			console.log(msg.topic);
+//			console.log(msg.payload);
+//			console.log(action);
 			switch( action ) {
 				case "Image":
 					vapix.image( camera, msg.payload, function(error,response ) {

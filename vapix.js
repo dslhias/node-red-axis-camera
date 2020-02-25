@@ -244,7 +244,6 @@ exports.listACAP = function( camera, callback ) {
 
 exports.installACAP = function( camera, filepath, callback ) {
 	var path = '/axis-cgi/applications/upload.cgi'
-//	var url = address + '/axis-cgi/packagemanager.cgi'
 	var req = request.post( {url:camera.url+path,strictSSL: false},function (error, response, body) {
 		body = body?body.trim():"";
 		if( error ) {

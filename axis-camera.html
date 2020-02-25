@@ -114,7 +114,7 @@
         <dd> If request fails, msg.error is set to true.  msg.payload may give hints on the cause</dd>
     </dl>	
 
-	<h3>Request Image</h3>
+	<h3>IMAGE</h3>
     <dl class="message-properties">
         <dt>Input payload<span class="property-type">string</span></dt>
         <dd> Image media profile </br>Example: resolution=640x360&text=0</dd>
@@ -122,13 +122,13 @@
         <dd> Default output is JPEG binary buffer.  Optional set Output Format to Base64</dd>
     </dl>	
 
-	<h3>Request: HTTP GET</h3>
+	<h3>HTTP GET</h3>
     <dl class="message-properties">
         <dt>Input payload<span class="property-type">string</span></dt>
         <dd> The request string (e.g. "/local/packages/someACAP?data=1"</dd>
     </dl>	
 	
-	<h3>Request: Get Camera Property</h3>
+	<h3>GET PROPERTY</h3>
     <dl class="message-properties">
         <dt>payload<span class="property-type">string</span></dt>
         <dd> The camera parameter path (without 'root.').</dd>
@@ -137,41 +137,39 @@
 		<i>See the VAPIX parameter documentation.</i></p>
     </dl>	
 
-	<h3>Request: Set Property</h3>
+	<h3>SET PROPERTY</h3>
     <dl class="message-properties">
         <dt>topic<span class="property-type">string</span></dt>
         <dd> The Axis parameter group path (without root).  Check VAPIX documentation.</dd>
         <dt>payload<span class="property-type">object</span></dt>
-        <dd> An object with the properties to be set.  Note that sub group objects will NOT be passed to the Axis device</dd>
-		<p>See Get Properties</p>
+        <dd> An object with the properties to be set.  Note that sub group objects will NOT be set</dd>
     </dl>	
 
-	<h3>Request: List Accounts</h3>
+	<h3>LIST ACCOUNTS</h3>
 	<p>List all the user accounts defined in the device</p>
 
-	<h3>Request: Set Account</h3>
+	<h3>SET ACCOUNT</h3>
     <dl class="message-properties">
         <dt>payload<span class="property-type">object</span></dt>
-        <dd> The account that will be added or updated</dd>
 		<p>{<br/>&nbsp;&nbsp;user: "theUser",<br/>&nbsp;&nbsp;password:"thePassword",<br/>&nbsp;&nbsp;privileges:"Administrator | Operator | Viewer"<br/>}</p>
     </dl>	
 	
-	<h3>List ACAP</h3>
+	<h3>LIST ACAP</h3>
     <p>List all the ACAP installed on the device.</p>
 
-	<h3>Request: Start/Stop/Remove ACAP</h3>
+	<h3>START/STOP/REMOVE ACAP</h3>
     <dl class="message-properties">
-        <dt>data<span class="property-type">string</span></dt>
-        <dd> The ACAP package ID (Name property of List ACAP)</dd>
+        <dt>payload<span class="property-type">string</span></dt>
+        <dd> The ACAP package ID</dd>
     </dl>	
 	
-	<h3>Request: Install ACAP</h3>
+	<h3>INSTALL ACAP</h3>
     <dl class="message-properties">
-        <dt>payload<span class="property-type">string | EMPTY</span></dt>
+        <dt>payload<span class="property-type">string</span></dt>
         <dd> The full file path to the ACAP eap-file stored on host.</dd>
     </dl>	
-	<h3>Request: Set Remote Syslog</h3>
-	<p>Connect the device to a remote syslog server.  The device needs to be restarted 
+	<h3>REMOTE SYSLOG</h3>
+	<p>Connect the camera to a remote syslog server.  The device needs to be restarted 
 		after a successful operation. Setting <code>msg.payload</code> to false will remove/disable remote syslog</p>
     <dl class="message-properties">
         <dt>payload<span class="property-type">Object</span></dt>
@@ -179,5 +177,11 @@
 		<br/>&nbsp;&nbsp;port: 514,
 		<br/>&nbsp;&nbsp;level:"info | warning | error | critical",
 		<br/>&nbsp;&nbsp;access:true | false<br/>}</p>
+    </dl>	
+	<h3>UPDATE FIRMWARE</h3>
+    <dl class="message-properties">
+        <dt>payload<span class="property-type">string</span></dt>
+        <dd> The full file path to the fimrware (stored on the host).</dd>
+		<p><i>Example: /home/user/myfiles/XXXX.bin</i></p>
     </dl>	
 </script>
