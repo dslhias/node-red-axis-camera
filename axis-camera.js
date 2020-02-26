@@ -24,6 +24,7 @@ module.exports = function(RED) {
 		this.account = config.account;
 		this.address = config.address;
 		this.action = config.action;
+		this.data = config.data;
 		this.format = config.format;
         var node = this;
         node.on('input', function(msg) {
@@ -31,18 +32,22 @@ module.exports = function(RED) {
 			var address = msg.address || node.address;
 			var camera = {
 				url: account.protocol + '://' + address,
-				user: account.credentials.user,
-				password: account.credentials.password
+				user: msg.user || account.credentials.user,
+				password: msg.password || account.credentials.password
+			}
+			if( !camera.user || !camera.password || camera.url.length < 10) {
+				msg.error = true;
+				msg.payload = "Invalid input (user,password or address)";
+				node.send(msg);
+				return;
 			}
 			var format = node.format;
 			var action = msg.action || node.action;
-//			console.log("Input");
-//			console.log(msg.topic);
-//			console.log(msg.payload);
-//			console.log(action);
+			var payload = node.data || msg.payload;
+			
 			switch( action ) {
 				case "Image":
-					vapix.image( camera, msg.payload, function(error,response ) {
+					vapix.image( camera, payload, function(error,response ) {
 						if( error ) {
 							msg.error = true;
 							msg.payload = response.toString();
@@ -58,7 +63,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "HTTP GET":
-					var options = {url: camera.url + msg.payload, strictSSL: false}
+					var options = {url: camera.url + payload, strictSSL: false}
 					if( format === "binary" || format === "base64" )
 						options.encoding = null;
 					request.get(options, function (error, response, body) {
@@ -89,7 +94,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Get Properties":
-					vapix.getParam( camera, msg.payload, function( error, response ) {
+					vapix.getParam( camera, payload, function( error, response ) {
 						msg.error = false;
 						msg.payload = response;
 						if( error )
@@ -100,7 +105,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Set Properties":
-					vapix.setParam( camera, msg.topic, msg.payload, function(error, response ){
+					vapix.setParam( camera, msg.topic, payload, function(error, response ){
 						msg.error = false;
 						msg.payload = response;
 						if( error )
@@ -120,7 +125,7 @@ module.exports = function(RED) {
 				break;
 
 				case "Set Account":
-					vapix.setAccount( camera, msg.payload, function(error,response) {
+					vapix.setAccount( camera, payload, function(error,response) {
 						msg.error = false;
 						msg.payload = response;
 						if( error )
@@ -187,7 +192,7 @@ module.exports = function(RED) {
 				break;
 
 				case 'Start ACAP':
-					vapix.controlACAP( camera, "start", msg.payload,  function(error, response ) {
+					vapix.controlACAP( camera, "start", payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
 						if( error ) {
@@ -198,7 +203,7 @@ module.exports = function(RED) {
 					});
 				break;
 				case 'Stop ACAP':
-					vapix.controlACAP( camera, "stop", msg.payload,  function(error, response ) {
+					vapix.controlACAP( camera, "stop", payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
 						if( error ) {
@@ -209,7 +214,7 @@ module.exports = function(RED) {
 					});
 				break;
 				case 'Remove ACAP':
-					vapix.controlACAP( camera, "remove", msg.payload,  function(error, response ) {
+					vapix.controlACAP( camera, "remove", payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
 						if( error ) {
@@ -222,7 +227,7 @@ module.exports = function(RED) {
 
 				case 'Install ACAP':
 					node.status({fill:"blue",shape:"dot",text:"Installing..."});
-					vapix.installACAP( camera , msg.payload, function(error, response ) {
+					vapix.installACAP( camera , payload, function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
 						if( error ) {
@@ -237,8 +242,8 @@ module.exports = function(RED) {
 
 				case 'Firmware Update':
 					node.status({fill:"blue",shape:"dot",text:"Updating..."});
-					vapix.updateFimrware( camera , msg.payload, function(error, response ) {
-						msg.payload = response;
+					vapix.updateFimrware( camera , payload, function(error, response ) {
+						payload = response;
 						msg.error = false;
 						if( error ) {
 							node.status({fill:"red",shape:"dot",text:"Failed"});
@@ -263,7 +268,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Create Certificate":
-					vapix.createCertificate( camera, msg.topic, msg.payload, function(error, response) {
+					vapix.createCertificate( camera, msg.topic, payload, function(error, response) {
 						if( error )
 							msg.error = true;
 						else	
@@ -274,7 +279,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Request CSR":
-					vapix.requestCSR( camera, msg.topic, msg.payload, function(error, response) {
+					vapix.requestCSR( camera, msg.topic, payload, function(error, response) {
 						if( error )
 							msg.error = true;
 						else	
@@ -296,7 +301,7 @@ module.exports = function(RED) {
 				break;
 				
 				case "Remote Syslog":
-					vapix.request(camera + '/axis-cgi/param.cgi?action=update&root.system.editcgi=yes', user, password, function(error,response ) {
+					vapix.request(camera,'/axis-cgi/param.cgi?action=update&root.system.editcgi=yes', function(error,response ) {
 						if( error ) {
 							msg.error = true;
 							node.send(response);
@@ -312,7 +317,7 @@ module.exports = function(RED) {
 						body += '&mode=0100644';
 						body += '&convert_crlf_to_lf=on';
 						body += '&content=';
-						body += '#Added by node-red-axis-camera syslog config\n';
+						body += '#Added by node-red-contrib-axis-camera Remote Syslog\n';
 						if( !msg.payload || msg.payload === null || msg.payload === false ) {
 							body += '#Remote syslog is disabled\n';
 						} else {
@@ -353,7 +358,7 @@ module.exports = function(RED) {
 							msg.error = false;
 							msg.payload = "OK";
 							node.send(msg);
-							vapix.request(camera, '/axis-cgi/param.cgi?action=update&root.system.editcgi=no', user, password, function(error,response ) {});
+							vapix.request(camera, '/axis-cgi/param.cgi?action=update&root.system.editcgi=no', function(error,response ) {});
 						});
 					});
 				break;
@@ -373,6 +378,7 @@ module.exports = function(RED) {
             name: {type:"text"},
 			account: {type:"Camera Account"},
 			address: {type:"text"},
+			data: {type: "text"},
 			action: { type:"text" },
 			format: { type: "text"}
 		}		

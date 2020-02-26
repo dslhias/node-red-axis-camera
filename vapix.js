@@ -37,7 +37,7 @@ exports.post = function( camera, path, data, callback ) {
 			return;
 		}
 		callback(null,body);
-	}).auth(user, password, false);
+	}).auth(camera.user, camera.password, false);
 }
 
 exports.soap = function( camera, soapBody, callback ) {

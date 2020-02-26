@@ -1,23 +1,54 @@
 {
-  "name": "node-red-contrib-axis-camera",
+  "_from": "github:pandosme/node-red-axis-camera",
+  "_id": "node-red-contrib-axis-camera@0.1.1",
+  "_inBundle": false,
+  "_integrity": "",
+  "_location": "/node-red-contrib-axis-camera",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "git",
+    "raw": "pandosme/node-red-axis-camera",
+    "rawSpec": "pandosme/node-red-axis-camera",
+    "saveSpec": "github:pandosme/node-red-axis-camera",
+    "fetchSpec": null,
+    "gitCommittish": null
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "github:pandosme/node-red-axis-camera#d8748d1e9b329d49889e42953e2c133f35e834b3",
+  "_spec": "pandosme/node-red-axis-camera",
+  "_where": "/home/fred/.node-red",
   "author": {
     "name": "Pandos Me"
   },
+  "bugs": {
+    "url": "https://github.com/pandosme/node-red-axis-camera/issues"
+  },
+  "bundleDependencies": false,
   "dependencies": {
     "request": "^2.88.0",
     "xml2js": "^0.4.22"
   },
+  "deprecated": false,
   "description": "Axis Camera Node",
+  "homepage": "https://github.com/pandosme/node-red-axis-camera#readme",
+  "keywords": [
+    "node-red",
+    "Axis",
+    "Camera"
+  ],
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/pandosme/node-red-axis-camera.git"
-  },
+  "name": "node-red-contrib-axis-camera",
   "node-red": {
     "nodes": {
       "axis-camera": "axis-camera.js"
     }
   },
-  "keywords": [ "node-red","Axis", "Camera" ],
-  "version": "0.1.1"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pandosme/node-red-axis-camera.git"
+  },
+  "version": "0.1.2"
 }
