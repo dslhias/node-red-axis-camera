@@ -7,11 +7,11 @@ var exports = module.exports = {};
 exports.request = function( camera, path,callback ) {
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, "VAPIX Request failed");
+			callback( true, "VAPIX Request failed");
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, body );
 			return;
 		}
 		if( body.search("Error") >= 0 ) {
@@ -25,15 +25,15 @@ exports.request = function( camera, path,callback ) {
 exports.post = function( camera, path, data, callback ) {
 	request.post({url: camera.url+path,body: data,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, "VAPIX Post failed" );
+			callback( true, "VAPIX Post failed" );
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( 401, "Unauthorized request" );
+			callback( true, "Unauthorized request" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, body );
 			return;
 		}
 		callback(null,body);
@@ -59,27 +59,27 @@ exports.soap = function( camera, soapBody, callback ) {
 	
 	request.post({url: camera.url+'/vapix/services',body: soapEnvelope,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, "Soap request error" );
+			callback( true, "Soap request error" );
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( 401, "Unauthorized request" );
+			callback( true, "Unauthorized request" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
 			parseSOAPResponse( body,
 				function(result){ //success
-					callback(response.statusCode,result);
+					callback(true,result);
 				},
 				function(result) { //
-					callback(response.statusCode,"Soap Parse error");
+					callback(true,"Soap Parse error");
 				}
 			)
 			return;
 		}
 		parseSOAPResponse( body,
 			function(result){ //success
-				callback(null,result);
+				callback(false,result);
 			},
 			function(result) {
 				callback(true,result);
@@ -94,11 +94,11 @@ exports.image = function( camera, mediaProfil, callback ) {
 		path += '?' + mediaProfil;
 	request.get({url:camera.url+path,encoding:null,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, body);
+			callback( true, body);
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, body );
 			return;
 		}
 		callback( null, body );
@@ -111,13 +111,14 @@ exports.getParam = function( camera, paramPath, callback ) {
 		return;
 	}
 	var path = '/axis-cgi/param.cgi?action=list&group=' + paramPath
+	console.log(path);
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, "VAPIX Parameter Request failed");
+			callback( true, "VAPIX Parameter Request failed");
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, body );
 			return;
 		}
 		if( body.search("Error") >= 0 ) {
@@ -189,11 +190,11 @@ exports.setParam = function( camera, group, parameters, callback ) {
 	}
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, "Request error: " + body);
+			callback( true, "Request error: " + body);
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, body );
 			return;
 		}
 		if( body.search("Error") === -1 )
@@ -207,11 +208,11 @@ exports.listACAP = function( camera, callback ) {
 	var path =  '/axis-cgi/applications/list.cgi';
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, "Request error: " + body);
+			callback( true, "Request error: " + body);
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, body );
 			return;
 		}
 		if( body.search("Error") >= 0 ) {

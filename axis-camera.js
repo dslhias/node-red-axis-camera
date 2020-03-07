@@ -44,7 +44,11 @@ module.exports = function(RED) {
 			var format = node.format;
 			var action = msg.action || node.action;
 			var payload = node.data || msg.payload;
-			
+			console.log({
+				camera: camera.url,
+				action: action,
+				paylod: payload
+			});
 			switch( action ) {
 				case "Image":
 					vapix.image( camera, payload, function(error,response ) {
@@ -99,7 +103,6 @@ module.exports = function(RED) {
 						msg.payload = response;
 						if( error )
 							msg.error = true;
-						else
 						node.send( msg );
 					});
 				break;
