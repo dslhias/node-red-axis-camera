@@ -10,3 +10,6 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 * Enable remote syslog server
 * Update Firmware
 
+## Changelog
+### Version 0.1.3
+* Fixed response on Get Property when authentication failed
