@@ -52,6 +52,7 @@
         <select id="node-input-action">
             <option value="Image">Image</option>
             <option value="HTTP GET">HTTP GET</option>
+            <option value="HTTP POST">HTTP POST</option>
             <option value="Get Properties">Get Properties</option>
             <option value="Set Properties">Set Properties</option>
             <option value="List Accounts">List Accounts</option>
@@ -116,117 +117,134 @@
 	<h3>Axis Camera Node</h3>
 	<p>May work on other Axis device besides cameras but this has not been validated</p>
 	<h3>Inputs:</h3>
-    <dl class="message-properties">
+	<dl class="message-properties">
 		<dt>credentials<span class="property-type">configuration</span></dt>
 		<dd>Camera credentials are required.  User and password may be overriden by 
 		<code>msg.user</code> and <code>msg.password</code></dd>
-    </dl>	
+	</dl>	
 	
-    <dl class="message-properties">
+	<dl class="message-properties">
 		<dt>address<span class="property-type">string</span></dt>
 		<dd>IP address or FQDN.  Address can be overriden using <code>msg.address</code></dd>
-    </dl>	
+	</dl>	
 
-    <dl class="message-properties">
+	<dl class="message-properties">
 		<dt>action<span class="property-type">string</span></dt>
 		<dd>See list below.</dd>
-    </dl>	
+	</dl>	
 
-    <dl class="message-properties">
+	<dl class="message-properties">
 		<dt>Output format<span class="property-type">string</span></dt>
 		<dd>Optional change the output format (only applicable on selected actions</dd>
-    </dl>	
+	</dl>	
 
-    <dl class="message-properties">
+	<dl class="message-properties">
 		<dt>msg.topic<span class="property-type">string | object</span></dt>
 		<dd>Only used in selected actions</dd>
-    </dl>	
+	</dl>	
 
-    <dl class="message-properties">
+	<dl class="message-properties">
 		<dt>msg.payload<span class="property-type">string | object</span></dt>
 		<dd>Payload depends on the action.  Setting <code>Payload</code> in the configuration will override 
 		<code>msg.payload</code>.  Only use override when there is only one possible payload</dd>
-    </dl>	
+	</dl>	
 
 	<h3>Outputs:</h3>
-    <dl class="message-properties">
+	<dl class="message-properties">
 		<dt>msg.error<span class="property-type">bool</span></dt>
 		<dd>True if the action failed.  <code>msg.payload</code> may include clues on what was wrong.</dd>
-    </dl>	
+	</dl>	
 
-    <dl class="message-properties">
+	<dl class="message-properties">
 		<dt>msg.payload<span class="property-type">object | string | buffer</span></dt>
 		<dd>Depends on action and output format</dd>
-    </dl>	
+	</dl>	
 
 	<h3>IMAGE</h3>
-    <dl class="message-properties">
-        <dt>Input payload<span class="property-type">string</span></dt>
-        <dd> Image media profile </br><i>Example: resolution=640x360&text=0</i></dd>
-        <dt>Output payload<span class="property-type">buffer | string</span></dt>
-        <dd> Default output is JPEG binary buffer.  Optional set <code>Output Format</code> to Base64</dd>
-    </dl>	
+	<p>Fetches an image using the VAPIX image request parameters</p>
+	<dl class="message-properties">
+		<dt>Input payload<span class="property-type">string</span></dt>
+		<dd> Image media profile </br><i>Example: resolution=640x360&text=0</i></dd>
+		<dt>Output payload<span class="property-type">buffer | string</span></dt>
+		<dd> Default output is JPEG binary buffer.  Optional set <code>Output Format</code> to Base64</dd>
+	</dl>	
 
 	<h3>HTTP GET</h3>
-    <dl class="message-properties">
-        <dt>payload<span class="property-type">string</span></dt>
-        <dd>The URL path <i>e.g. /local/packages/someACAP?data=1</i></dd>
-    </dl>	
-	
+	<p>To be used for VAPIX or ACAP API requests not supported by this node</p>
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">string</span></dt>
+		<dd>The URL path <i>e.g. /local/packages/someACAP?data=1</i></dd>
+	</dl>	
+
+	<h3>HTTP POST</h3>
+	<p>To be used for VAPIX or ACAP API requests not supported by this node</p>
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">string</span></dt>
+		<dd>The URL path <i>e.g. /local/packages/someACAP?data=1</i></dd>
+	</dl>	
+
 	<h3>GET PROPERTY</h3>
-    <dl class="message-properties">
-        <dt>payload<span class="property-type">string</span></dt>
-        <dd> The camera parameter group path (without 'root.').</dd>
+	<p>Read and parses the response to VAPIX param.cgi</p>
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">string</span></dt>
+		<dd> The camera parameter group path (without 'root.').</dd>
 		<p><i>Examples: <code>network</code> or <code>network.eth0</code></i></p>
 		<p>Common Groups: properties, brand, system, image, imagesource, audio, network, ptz, storage, time<br/>
 		<i>See the VAPIX parameter documentation.</i></p>
-    </dl>	
+	</dl>	
 
 	<h3>SET PROPERTY</h3>
-    <dl class="message-properties">
-        <dt>topic<span class="property-type">string</span></dt>
-        <dd> The Axis parameter group path (without root).  Check VAPIX documentation.</dd>
-        <dt>payload<span class="property-type">object</span></dt>
-        <dd> An object with the properties to be set.  Note that sub group objects will NOT be set</dd>
-    </dl>	
+	<p>Sets and parses the response to VAPIX param.cgi</p>
+	<dl class="message-properties">
+		<dt>topic<span class="property-type">string</span></dt>
+		<dd> The Axis parameter group path (without root).  Check VAPIX documentation.</dd>
+		<dt>payload<span class="property-type">object</span></dt>
+		<dd> An object with the properties to be set.  Note that sub group objects will NOT be set</dd>
+	</dl>	
 
 	<h3>LIST ACCOUNTS</h3>
 	<p>List all the user accounts defined in the device</p>
 
 	<h3>SET ACCOUNT</h3>
-    <dl class="message-properties">
-        <dt>payload<span class="property-type">object</span></dt>
+	<p>Adds or updates a user account</p>
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">object</span></dt>
 		<p>{<br/>&nbsp;&nbsp;user: "theUser",<br/>&nbsp;&nbsp;password:"thePassword",<br/>&nbsp;&nbsp;privileges:"Administrator | Operator | Viewer"<br/>}</p>
-    </dl>	
+	</dl>	
 	
 	<h3>LIST ACAP</h3>
-    <p>List all the ACAP installed on the device.</p>
+	<p>List all the ACAP installed on the device</p>
 
 	<h3>START/STOP/REMOVE ACAP</h3>
-    <dl class="message-properties">
-        <dt>payload<span class="property-type">string</span></dt>
-        <dd> The ACAP package ID</dd>
-    </dl>	
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">string</span></dt>
+		<dd> The ACAP package ID</dd>
+	</dl>	
 	
 	<h3>INSTALL ACAP</h3>
-    <dl class="message-properties">
-        <dt>payload<span class="property-type">string</span></dt>
-        <dd> The full file path to the ACAP eap-file stored on host.</dd>
-    </dl>	
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">string</span></dt>
+		<dd> The full file path to the ACAP eap-file stored on host.</dd>
+	</dl>
+	
 	<h3>REMOTE SYSLOG</h3>
 	<p>Connect the camera to a remote syslog server.
 	The device needs to be restarted. Setting <code>msg.payload</code> to false will remove/disable remote syslog</p>
-    <dl class="message-properties">
-        <dt>payload<span class="property-type">Object</span></dt>
-		<p>{<br/>&nbsp;&nbsp;address: "IP or FQDN",
-		<br/>&nbsp;&nbsp;port: 514,
-		<br/>&nbsp;&nbsp;level:"info | warning | error | critical",
-		<br/>&nbsp;&nbsp;access:true | false<br/>}</p>
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">Object</span></dt>
+		<p>
+			{<br/>
+			&nbsp;&nbsp;address: "IP or FQDN",<br/>
+			&nbsp;&nbsp;port: 514,<br/>
+			&nbsp;&nbsp;level:"info | warning | error | critical",<br/>
+			&nbsp;&nbsp;access:true | false<br/>
+			}
+		</p>
     </dl>	
 	<h3>UPDATE FIRMWARE</h3>
-    <dl class="message-properties">
-        <dt>payload<span class="property-type">string</span></dt>
-        <dd> The full file path to the fimrware (stored on the host).</dd>
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">string</span></dt>
+        	<dd> The full file path to the fimrware (stored on the host).</dd>
 		<p><i>Example: /home/user/myfiles/XXXX.bin</i></p>
-    </dl>	
+	</dl>	
 </script>
