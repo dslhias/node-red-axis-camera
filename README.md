@@ -13,3 +13,4 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 ## Changelog
 ### Version 1.0.0
 * Fixed response on Get Property when authentication failed
+* Added HTTP POST
