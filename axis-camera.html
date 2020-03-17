@@ -144,6 +144,11 @@
 	</dl>	
 
 	<dl class="message-properties">
+		<dt>msg.url<span class="property-type">string | object</span></dt>
+		<dd>Only used in HTTP POST</dd>
+	</dl>	
+
+	<dl class="message-properties">
 		<dt>msg.payload<span class="property-type">string | object</span></dt>
 		<dd>Payload depends on the action.  Setting <code>Payload</code> in the configuration will override 
 		<code>msg.payload</code>.  Only use override when there is only one possible payload</dd>
@@ -173,14 +178,19 @@
 	<p>To be used for VAPIX or ACAP API requests not supported by this node</p>
 	<dl class="message-properties">
 		<dt>payload<span class="property-type">string</span></dt>
-		<dd>The URL path <i>e.g. /local/packages/someACAP?data=1</i></dd>
+		<dd>The URL path <i>e.g. /local/packages/someACAP/someAPI?name=john&age=31</i></dd>
 	</dl>	
 
 	<h3>HTTP POST</h3>
 	<p>To be used for VAPIX or ACAP API requests not supported by this node</p>
 	<dl class="message-properties">
+		<dt>url<span class="property-type">string</span></dt>
+		<dd>HTTP path to post data <i>e.g. /local/packages/someACAP/somePostAPI</i></dd>
+	</dl>	
+
+	<dl class="message-properties">
 		<dt>payload<span class="property-type">string</span></dt>
-		<dd>The URL path <i>e.g. /local/packages/someACAP?data=1</i></dd>
+		<dd>The body to post</dd>
 	</dl>	
 
 	<h3>GET PROPERTY</h3>
