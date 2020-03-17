@@ -11,5 +11,5 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 * Update Firmware
 
 ## Changelog
-### Version 0.1.3
+### Version 1.0.0
 * Fixed response on Get Property when authentication failed
