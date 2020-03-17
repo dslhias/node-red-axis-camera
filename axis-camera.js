@@ -10,7 +10,7 @@ module.exports = function(RED) {
 	
 	RED.nodes.registerType("Camera Account",Axis_Camera_Account,{
 		defaults: {
-            name: {type:""},
+			name: {type:""},
 			protocol: {type:"text"}
 		},
 		credentials: {
@@ -20,14 +20,14 @@ module.exports = function(RED) {
 	});
 	
     function Axis_Camera_Node(config) {
-        RED.nodes.createNode(this,config);
+	RED.nodes.createNode(this,config);
 		this.account = config.account;
 		this.address = config.address;
 		this.action = config.action;
 		this.data = config.data;
 		this.format = config.format;
-        var node = this;
-        node.on('input', function(msg) {
+		var node = this;
+		node.on('input', function(msg) {
 			var account = RED.nodes.getNode(node.account);
 			var address = msg.address || node.address;
 			var camera = {
@@ -35,29 +35,17 @@ module.exports = function(RED) {
 				user: msg.user || account.credentials.user,
 				password: msg.password || account.credentials.password
 			}
-			if( !camera.user || !camera.password || camera.url.length < 10) {
-				msg.error = true;
-				msg.payload = "Invalid input (user,password or address)";
-				node.send(msg);
-				return;
-			}
+			if( !camera.user || camera.user.length < 2){msg.error = true;msg.payload = "Invalid input [user]";node.send(msg);return;}
+			if( !camera.password || camera.password.length < 2){msg.error = true;msg.payload = "Invalid input [password]";node.send(msg);return;}
+			if( !camera.url || camera.url.length < 10) {msg.error = true;msg.payload = "Invalid input [url])";node.send(msg);return;}
 			var format = node.format;
 			var action = msg.action || node.action;
 			var payload = node.data || msg.payload;
-			console.log({
-				camera: camera.url,
-				action: action,
-				paylod: payload
-			});
+			
 			switch( action ) {
 				case "Image":
 					vapix.image( camera, payload, function(error,response ) {
-						if( error ) {
-							msg.error = true;
-							msg.payload = response.toString();
-							node.send(msg);
-							return;
-						}
+						if( error ) {msg.error = true;msg.payload = response.toString();node.send(msg);return;}
 						msg.error = false;
 						msg.payload = response;
 						if( format === "base64" )
@@ -71,32 +59,38 @@ module.exports = function(RED) {
 					if( format === "binary" || format === "base64" )
 						options.encoding = null;
 					request.get(options, function (error, response, body) {
-						if( error ) {
-							msg.error = true;
-							msg.payload = body.toString();
-							node.send(msg);
-							return;
-						}
-						if( response.statusCode !== 200 ) {
-							msg.error = true;
-							msg.payload = body.toString();
-							node.send(msg);
-							return;
-						}
+						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
 						msg.payload = body;
 						if( format === "base64")
 							msg.payload = body.toString('base64');
 						if( format === "json" ) {
 							msg.payload = JSON.parse(body);
-							if( !msg.payload ) {
-								msg.error = true;
-								msg.payload = "Error parsing resonse as JSON";
-							}
+							if( !msg.payload ) {msg.error = true;msg.payload = "Error parsing response as JSON";}
 						}
 						node.send(msg);
 					}).auth( camera.user, camera.password, false);
 				break;
-				
+
+				case "HTTP POST":
+					if( !msg.url || msg.url.length ){msg.error=true;msg.payload = "Invalid URL to POST";node.send(msg);return;}
+					var options = {url: camera.url + msg.url, body: msg.payload, strictSSL: false}
+					if( format === "binary" || format === "base64" )
+						options.encoding = null;
+					request.post(options, function (error, response, body) {
+						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+						msg.payload = body;
+						if( format === "base64")
+							msg.payload = body.toString('base64');
+						if( format === "json" ) {
+							msg.payload = JSON.parse(body);
+							if( !msg.payload ) {msg.error = true;msg.payload = "Error parsing response as JSON";}
+						}
+						node.send(msg);
+					}).auth( camera.user, camera.password, false);
+				break;
+					
 				case "Get Properties":
 					vapix.getParam( camera, payload, function( error, response ) {
 						msg.error = false;
@@ -140,12 +134,7 @@ module.exports = function(RED) {
 				case "List Connections":
 					vapix.request( camera, '/axis-cgi/admin/connection_list.cgi?action=get', function(error,response ) {
 						msg.error = false;
-						if( error ) {
-							msg.error = true;
-							msg.payload = response;
-							node.send(msg);
-							return;
-						}
+						if( error ) {msg.error = true;msg.payload = response;node.send(msg);return;}
 						var rows = response.split('\n');
 						var list = [];
 						for( var i = 1; i < rows.length; i++) {
@@ -172,12 +161,7 @@ module.exports = function(RED) {
 				case 'List Events':
 					vapix.listEvents( camera, function( error, response ) {
 						msg.error = false;
-						if( error ) {
-							msg.error = true;
-							msg.payload = response;
-							node.send(msg);
-							return;
-						}
+						if( error ) {msg.error = true;msg.payload = response;node.send(msg);return;}
 						msg.payload = response;
 						node.send(msg);
 					});
@@ -198,10 +182,7 @@ module.exports = function(RED) {
 					vapix.controlACAP( camera, "start", payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
-						if( error ) {
-							msg.error = true;
-							msg.payload = error;
-						}
+						if( error ) {msg.error = true;msg.payload = error;}
 						node.send( msg );
 					});
 				break;
@@ -209,21 +190,16 @@ module.exports = function(RED) {
 					vapix.controlACAP( camera, "stop", payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
-						if( error ) {
-							msg.error = true;
-							msg.payload = error;
-						}
+						if( error ) {msg.error = true;msg.payload = error;}
 						node.send( msg );
 					});
 				break;
+					
 				case 'Remove ACAP':
 					vapix.controlACAP( camera, "remove", payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
-						if( error ) {
-							msg.error = true;
-							msg.payload = error;
-						}
+						if( error ) {msg.error = true;msg.payload = error;}
 						node.send( msg );
 					});
 				break;
@@ -235,7 +211,7 @@ module.exports = function(RED) {
 						msg.error = false;
 						if( error ) {
 							node.status({fill:"red",shape:"dot",text:"Failed"});
-							msg.error = error;
+							msg.error = true;
 						} else {
 							node.status({fill:"green",shape:"dot",text:"Success"});
 						}
@@ -250,7 +226,7 @@ module.exports = function(RED) {
 						msg.error = false;
 						if( error ) {
 							node.status({fill:"red",shape:"dot",text:"Failed"});
-							msg.error = error;
+							msg.error = true;
 						} else {
 							node.status({fill:"green",shape:"dot",text:"Success"});
 						}
@@ -258,7 +234,6 @@ module.exports = function(RED) {
 					});
 				break;
 			
-				
 				case "List Certificates":
 					vapix.listCertificates( camera, function(error, response ) {
 						msg.error = false;
@@ -305,11 +280,7 @@ module.exports = function(RED) {
 				
 				case "Remote Syslog":
 					vapix.request(camera,'/axis-cgi/param.cgi?action=update&root.system.editcgi=yes', function(error,response ) {
-						if( error ) {
-							msg.error = true;
-							node.send(response);
-							return;
-							}
+						if( error ) {msg.error = true;node.send(response);return;}
 						if( response.search("Error") >= 0 || response.search("DOCTYPE") >= 0 ) {
 							msg.error = true;
 							msg.payload = response;
