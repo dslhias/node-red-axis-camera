@@ -1,54 +1,32 @@
 {
-  "_from": "github:pandosme/node-red-axis-camera",
-  "_id": "node-red-contrib-axis-camera@0.1.1",
-  "_inBundle": false,
-  "_integrity": "",
-  "_location": "/node-red-contrib-axis-camera",
-  "_phantomChildren": {},
-  "_requested": {
-    "type": "git",
-    "raw": "pandosme/node-red-axis-camera",
-    "rawSpec": "pandosme/node-red-axis-camera",
-    "saveSpec": "github:pandosme/node-red-axis-camera",
-    "fetchSpec": null,
-    "gitCommittish": null
-  },
-  "_requiredBy": [
-    "#USER",
-    "/"
-  ],
-  "_resolved": "github:pandosme/node-red-axis-camera#d8748d1e9b329d49889e42953e2c133f35e834b3",
-  "_spec": "pandosme/node-red-axis-camera",
-  "_where": "/home/fred/.node-red",
-  "author": {
-    "name": "Pandos Me"
-  },
-  "bugs": {
-    "url": "https://github.com/pandosme/node-red-axis-camera/issues"
-  },
-  "bundleDependencies": false,
-  "dependencies": {
-    "request": "^2.88.0",
-    "xml2js": "^0.4.22"
-  },
-  "deprecated": false,
-  "description": "Axis Camera Node",
-  "homepage": "https://github.com/pandosme/node-red-axis-camera#readme",
+  "name": "node-red-contrib-axis-camera",
+  "version": "1.0.0",
+  "description": "Axis Camera Management Node (images but no video)",
   "keywords": [
     "node-red",
     "Axis",
     "Camera"
   ],
+  "homepage": "https://github.com/pandosme/node-red-axis-camera",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pandosme/node-red-axis-camera.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pandosme/node-red-axis-camera/issues"
+  },
+  "author": "Pandos Me <admin@pandos.me>",
   "license": "MIT",
-  "name": "node-red-contrib-axis-camera",
   "node-red": {
     "nodes": {
       "axis-camera": "axis-camera.js"
     }
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/pandosme/node-red-axis-camera.git"
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "0.1.3"
+  "dependencies": {
+    "request": "^2.88.0",
+    "xml2js": "^0.4.22"
+  }
 }
