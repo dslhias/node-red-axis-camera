@@ -73,11 +73,19 @@ module.exports = function(RED) {
 				break;
 
 				case "HTTP POST":
-					if( !msg.url || msg.url.length ){msg.error=true;msg.payload = "Invalid URL to POST";node.send(msg);return;}
+					if( !msg.url || msg.url.length < 5 ){msg.error=true;msg.payload = "Invalid msg.url";node.send(msg);return;}
 					var options = {url: camera.url + msg.url, body: msg.payload, strictSSL: false}
+					
+					if( typeof msg.payload === 'object' ) {
+						options.headers = {'Content-Type': 'application/json'};
+						options.body = JSON.stringify(msg.payload);
+					}
+					
 					if( format === "binary" || format === "base64" )
 						options.encoding = null;
+					
 					request.post(options, function (error, response, body) {
+						msg.error = false;
 						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
 						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
 						msg.payload = body;

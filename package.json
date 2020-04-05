@@ -1,7 +1,7 @@
 {
   "name": "node-red-contrib-axis-camera",
-  "version": "1.0.0",
-  "description": "Axis Camera Management Node (images but no video)",
+  "version": "1.0.1",
+  "description": "Axis Camera Management Node (no video)",
   "keywords": [
     "node-red",
     "Axis",
