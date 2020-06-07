@@ -237,6 +237,27 @@
 	<h3>MQTT Client</h3>
 	<p>Get device MQTT client and status</p>
 
+	<h3>Get MQTT Publish</h3>
+	<p>Get event publish settings (see Set MQTT Publish)</p>
+
+	<h3>Set MQTT Publish</h3>
+	<p>Defines which camera events will be published on MQTT.  You need to read the ONVIF/VAPIX specification to make specific filters</p>
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">Object</span></dt>
+		<p>
+			{<br/>
+			&nbsp;&nbsp;topic: "some/topic",<br/>
+			&nbsp;&nbsp;onvif: true | false, [Appends the ONVIF topic]<br/>
+			&nbsp;&nbsp;events: [
+			&nbsp;&nbsp;&nbsp;&nbsp;"//.", [This filter publish all camera events]<br/>
+			&nbsp;&nbsp;&nbsp;&nbsp;"axis:CameraApplicationPlatform//.",<br/>
+			&nbsp;&nbsp;&nbsp;&nbsp;"onvif:PTZController//.",<br/>
+			&nbsp;&nbsp;&nbsp;&nbsp;"onvif:Device/axis:IO/VirtualInput//."<br/>
+			&nbsp;&nbsp;]<br/>
+			}
+		</p>
+    </dl>	
+
 	<h3>MQTT Connect</h3>
 	<p>Initiate connection to MQTT broker.  If payload is null the client will disconnect and retain its settings.</p>
 	<dl class="message-properties">
@@ -261,6 +282,7 @@
 			}
 		</p>
     </dl>	
+
 	
 	<h3>LIST ACAP</h3>
 	<p>List all the ACAP installed on the device</p>

@@ -19,6 +19,6 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 ### Version 1.0.1
 * Fixed HTTP POST flaw
 
-### Version 1.2.1
+### Version 1.2.2
 * Added action 'Info' that responds with common needed properties of the camera
 * Added support for managing the built-in MQTT client.  Requires Axis firmware >= 9.80
