@@ -111,7 +111,7 @@ exports.getParam = function( camera, paramPath, callback ) {
 		return;
 	}
 	var path = '/axis-cgi/param.cgi?action=list&group=' + paramPath
-	console.log(path);
+//	console.log(path);
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
 			callback( true, "VAPIX Parameter Request failed");

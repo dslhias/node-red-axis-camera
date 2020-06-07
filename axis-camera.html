@@ -50,6 +50,7 @@
     <div class="form-row">
         <label for="node-input-action"><i class="icon-tag"></i> Action</label>
         <select id="node-input-action">
+            <option value="Info">Info</option>
             <option value="Image">Image</option>
             <option value="HTTP GET">HTTP GET</option>
             <option value="HTTP POST">HTTP POST</option>
@@ -57,6 +58,10 @@
             <option value="Set Properties">Set Properties</option>
             <option value="List Accounts">List Accounts</option>
             <option value="Set Account">Set Account</option>
+            <option value="MQTT Client">MQTT Client</option>
+            <option value="MQTT Connect">MQTT Connect</option>
+            <option value="Get MQTT Publish">Get MQTT Publish</option>
+            <option value="Set MQTT Publish">Set MQTT Publish</option>
             <option value="List ACAP">List ACAP</option>
             <option value="Start ACAP">Start ACAP</option>
             <option value="Stop ACAP">Stop ACAP</option>
@@ -165,6 +170,13 @@
 		<dd>Depends on action and output format</dd>
 	</dl>	
 
+	<h3>Info</h3>
+	<p>Generel information about the camera</p>
+	<dl class="message-properties">
+		<dt>Output payload<span class="property-type">Object</span></dt>
+		<dd> Camera properties</dd>
+	</dl>	
+	
 	<h3>IMAGE</h3>
 	<p>Fetches an image using the VAPIX image request parameters</p>
 	<dl class="message-properties">
@@ -221,6 +233,34 @@
 		<dt>payload<span class="property-type">object</span></dt>
 		<p>{<br/>&nbsp;&nbsp;user: "theUser",<br/>&nbsp;&nbsp;password:"thePassword",<br/>&nbsp;&nbsp;privileges:"Administrator | Operator | Viewer"<br/>}</p>
 	</dl>	
+
+	<h3>MQTT Client</h3>
+	<p>Get device MQTT client and status</p>
+
+	<h3>MQTT Connect</h3>
+	<p>Initiate connection to MQTT broker.  If payload is null the client will disconnect and retain its settings.</p>
+	<dl class="message-properties">
+		<dt>payload<span class="property-type">Object || null</span></dt>
+		<p>
+			{<br/>
+			&nbsp;&nbsp;host: "IP or FQDN",<br/>
+			&nbsp;&nbsp;port: "1883",<br/>
+			&nbsp;&nbsp;tls: true | false, [OPTIONAL default=false]<br/>
+			&nbsp;&nbsp;id: "Unique client name",<br/>
+			&nbsp;&nbsp;user: "username", [OPTIONAL if needed]<br/>
+			&nbsp;&nbsp;password: "password", [OPTIONAL if needed]<br/>
+			&nbsp;&nbsp;validateCertificate: true | false, [OPTIONAL default=false]<br/>
+			&nbsp;&nbsp;lastWillTestament: { [OPTIONAL]<br/>
+			&nbsp;&nbsp;&nbsp;&nbsp;topic: "topic",<br/>
+			&nbsp;&nbsp;&nbsp;&nbsp;payload: {object}<br/>
+			&nbsp;&nbsp;},<br/>
+			&nbsp;&nbsp;announcement: { [OPTIONAL]<br/>
+			&nbsp;&nbsp;&nbsp;&nbsp;topic: "topic",<br/>
+			&nbsp;&nbsp;&nbsp;&nbsp;payload: {object}<br/>
+			&nbsp;&nbsp;}<br/>
+			}
+		</p>
+    </dl>	
 	
 	<h3>LIST ACAP</h3>
 	<p>List all the ACAP installed on the device</p>

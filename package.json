@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-axis-camera",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "description": "Axis Camera Management Node (no video)",
   "keywords": [
     "node-red",
@@ -15,7 +15,7 @@
   "bugs": {
     "url": "https://github.com/pandosme/node-red-axis-camera/issues"
   },
-  "author": "Pandos Me <admin@pandos.me>",
+  "author": "Fred Juhlin <fred@juhlin.me>",
   "license": "MIT",
   "node-red": {
     "nodes": {

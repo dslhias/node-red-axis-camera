@@ -41,8 +41,61 @@ module.exports = function(RED) {
 			var format = node.format;
 			var action = msg.action || node.action;
 			var payload = node.data || msg.payload;
+			msg.error = false;
 			
 			switch( action ) {
+				case "Info":
+					var info = {};
+					vapix.getParam( camera, "brand", function( error, response ) {
+						msg.error = false;
+						msg.payload = response;
+						if( error ) {
+							msg.error = true;
+							node.send( msg );
+							return;
+						}
+						info.model = response.ProdNbr;
+						vapix.getParam( camera, "properties", function( error, response ) {
+							msg.error = false;
+							msg.payload = response;
+							if( error ) {
+								msg.error = true;
+								node.send( msg );
+								return;
+							}
+							info.serial = response.System.SerialNumber;
+							info.platform = response.System.Architecture;
+							info.chipset = "";
+							if( response.System.hasOwnProperty("Soc") ) {
+								var items = response.System.Soc.split(' ');
+								if( items.length > 1 )
+									info.chipset = items[1];
+								else
+									info.chipset = response.System.Soc;
+							}
+							info.firmware = response.Firmware.Version;
+							info.resolution = response.Image.Resolution.split(',')[0];
+							vapix.getParam( camera, "network", function( error, response ) {
+								msg.error = false;
+								msg.payload = response;
+								if( error ) {
+									msg.error = true;
+									node.send( msg );
+									return;
+								}
+								info.hostname = response.HostName;
+								if( response.hasOwnProperty("VolatileHostName") )
+									info.hostname = response.VolatileHostName.HostName;
+								info.IPv4 = response.eth0.IPAddress;
+								info.IPv6 = response.eth0.IPv6.IPAddresses;
+								info.mac = response.eth0.MACAddress;
+								msg.payload = info;
+								node.send(msg);
+							});
+						});
+					});
+				break;
+				
 				case "Image":
 					vapix.image( camera, payload, function(error,response ) {
 						if( error ) {msg.error = true;msg.payload = response.toString();node.send(msg);return;}
@@ -137,6 +190,249 @@ module.exports = function(RED) {
 							msg.error = error;
 						node.send( msg );
 					});
+				break;
+
+				case "MQTT Client":
+					var options = {
+						headers: {'Content-Type': 'application/json'},
+						strictSSL: false,
+						url: camera.url + "/axis-cgi/mqtt/client.cgi",
+						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "getClientStatus"})
+					};
+					request.post(options, function (error, response, body) {
+						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+						var client = JSON.parse(body).data;
+//						console.log(client.config.lastWillTestament);
+						msg.payload = {
+							active: client.status.state === "active",
+							status: client.status.connectionStatus, //connected, connecting, failed, disconnected
+							connected: client.status.connectionStatus === "Connected",
+							host: client.config.server.host,
+							port: client.config.server.port.toString(),
+							id: client.config.clientId,
+							tls: client.config.server.protocol === "ssl",
+							validateCertificate: client.config.ssl.validateServerCert,
+							user: client.config.username,
+							password: '********',
+							lastWillTestament: null,
+							announcement: null
+						}
+						if( client.config.hasOwnProperty("lastWillTestament") ) {
+							if( client.config.lastWillTestament.useDefault ) {
+								msg.payload.lastWillTestament = {
+									topic: "default",
+									payload: "default"
+								}
+							} else {
+								msg.payload.lastWillTestament = {
+									topic: client.config.lastWillTestament.topic,
+									payload: JSON.parse(client.config.lastWillTestament.message)
+								}
+							}
+						}
+						if( client.config.hasOwnProperty("connectMessage") ) {
+							if( client.config.connectMessage.useDefault ) {
+								msg.payload.announcement = {
+									topic: "default",
+									payload: "default"
+								}
+							} else {
+								msg.payload.announcement = {
+									topic: client.config.connectMessage.topic,
+									payload: JSON.parse(client.config.connectMessage.message)
+								}
+							}
+						}
+//						console.log(msg.payload);
+						node.send(msg);
+					}).auth( camera.user, camera.password, false);
+				break;
+				
+				case "MQTT Connect":
+					var options = {}
+					var connect = true;
+					var settings = msg.payload;
+					if( settings === null || settings === false ) {  //Disconnect request
+						options = {
+							headers: {'Content-Type': 'application/json'},
+							strictSSL: false,
+							url: camera.url + "/axis-cgi/mqtt/client.cgi",
+							body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "deactivateClient"})
+						};
+						request.post(options, function (error, response, body) {
+							if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+							if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+							msg.payload = "Disconnecting";
+							node.send(msg);
+						}).auth( camera.user, camera.password, false);
+						return;
+					}
+					
+					var user = "";
+					var password = "";
+					var tls = false;
+					var validateCertificate = false;
+					
+					if( !settings.hasOwnProperty("host") || settings.host.length === 0 ) {
+						msg.error = true;
+						msg.payload = "Host needs to be set";
+						node.send(msg);
+						return;
+					}
+					if( !settings.hasOwnProperty("port") || settings.port.length === 0 ) {
+						msg.error = true;
+						msg.payload = "Port needs to be set";
+						node.send(msg);
+						return;
+					}
+					
+					if( !settings.hasOwnProperty("id") || settings.id.length === 0 ) {
+						msg.error = true;
+						msg.payload = "Client id needs to be set";
+						node.send(msg);
+						return;
+					}
+
+					if( settings.hasOwnProperty("tls") )
+						tls = settings.tls === true;
+
+					var params = {
+							activateOnReboot: true,
+							server: {
+								protocol: tls?"ssl":"tcp",
+								host: settings.host,
+								port: parseInt(settings.port),
+						//      "basepath":"url-extension"
+							},
+							ssl: {
+								validateServerCert: validateCertificate
+							},
+							username: settings.user || "",
+							password: settings.password || "",
+							clientId: settings.id,
+							keepAliveInterval: 60,
+							connectTimeout: 60,	
+							cleanSession: true,
+							autoReconnect: true
+					}
+					
+					if( settings.hasOwnProperty("lastWillTestament") && settings.lastWillTestament !== null && settings.lastWillTestament !== false ) {
+						params.lastWillTestament = {
+							useDefault: false,
+							topic: settings.lastWillTestament.topic,
+							message: settings.lastWillTestament.payload,
+							retain: true,
+							qos: 1							
+						}
+						console.log(settings.lastWillTestament.payload);
+						if( typeof settings.lastWillTestament.payload === 'object' )
+							params.lastWillTestament.message = JSON.stringify(settings.lastWillTestament.payload);
+						params.disconnectMessage = JSON.parse(JSON.stringify(params.lastWillTestament));
+					}
+					if( settings.hasOwnProperty("announcement") && settings.announcement !== null && settings.announcement !== false ) {
+						params.connectMessage = {
+							useDefault: false,
+							topic: settings.announcement.topic,
+							message: settings.announcement.payload,
+							retain: true,
+							qos: 1							
+						}
+						if( typeof settings.announcement.payload === 'object' )
+							params.connectMessage.message = JSON.stringify(settings.announcement.payload);
+					}
+					console.log(params);
+					var options = {
+						headers: {'Content-Type': 'application/json'},
+						strictSSL: false,
+						url: camera.url + "/axis-cgi/mqtt/client.cgi",
+						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "configureClient",params: params})
+					};
+					request.post(options, function (error, response, body) {
+						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+						options = {
+							headers: {'Content-Type': 'application/json'},
+							strictSSL: false,
+							url: camera.url + "/axis-cgi/mqtt/client.cgi",
+							body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "activateClient"})
+						};
+						request.post(options, function (error, response, body) {
+							if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+							if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+							msg.payload = "Connecting";
+							node.send(msg);
+						}).auth( camera.user, camera.password, false);
+					}).auth( camera.user, camera.password, false);
+				break;
+				
+				case "Get MQTT Publish":
+					var options = {
+						headers: {'Content-Type': 'application/json'},
+						strictSSL: false,
+						url: camera.url + "/axis-cgi/mqtt/event.cgi",
+						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "getEventPublicationConfig"})
+					};
+					request.post(options, function (error, response, body) {
+						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+						data = JSON.parse(body).data.eventPublicationConfig;
+						console.log(data);
+						msg.payload = {
+							topic: data.customTopicPrefix,
+							onvif: data.appendEventTopic,
+							events: []
+						}
+						for( var i = 0; i < data.eventFilterList.length; i++ )
+							msg.payload.events.push(data.eventFilterList[i].topicFilter);
+						node.send(msg);
+					}).auth( camera.user, camera.password, false);
+				break;
+				
+				case "Set MQTT Publish":
+					var settings = msg.payload;
+					if( !settings.hasOwnProperty("topic") ) {
+						msg.error = true;
+						msg.payload = "Topic needs to be set";
+						node.send(msg);
+						return;
+					}
+					if( !settings.hasOwnProperty("events") ) {
+						msg.error = true;
+						msg.payload = "Events needs to be set";
+						node.send(msg);
+						return;
+					}
+					if( !Array.isArray(settings.events) )
+						settings.events = [];
+					var list = [];
+					for( var i = 0; i < settings.events.length; i++ ) {
+						list.push( {
+							topicFilter: settings.events[i],
+							qos: 0,
+							retain: "none"
+						});
+					}
+					params = {
+						eventFilterList:list,
+						topicPrefix: "custom",
+						customTopicPrefix: settings.topic,
+						appendEventTopic: settings.onvif || false,
+						includeTopicNamespaces : false,
+						includeSerialNumberInPayload: true
+					};
+					var options = {
+						headers: {'Content-Type': 'application/json'},
+						strictSSL: false,
+						url: camera.url + "/axis-cgi/mqtt/event.cgi",
+						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "configureEventPublication",params:params})
+					};
+					request.post(options, function (error, response, body) {
+						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+						msg.payload = "OK";
+						node.send(msg);
+					}).auth( camera.user, camera.password, false);
 				break;
 
 				case "List Connections":
