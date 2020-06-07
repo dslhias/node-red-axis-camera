@@ -325,7 +325,7 @@ module.exports = function(RED) {
 							retain: true,
 							qos: 1							
 						}
-						console.log(settings.lastWillTestament.payload);
+						//console.log(settings.lastWillTestament.payload);
 						if( typeof settings.lastWillTestament.payload === 'object' )
 							params.lastWillTestament.message = JSON.stringify(settings.lastWillTestament.payload);
 						params.disconnectMessage = JSON.parse(JSON.stringify(params.lastWillTestament));
@@ -341,7 +341,7 @@ module.exports = function(RED) {
 						if( typeof settings.announcement.payload === 'object' )
 							params.connectMessage.message = JSON.stringify(settings.announcement.payload);
 					}
-					console.log(params);
+					//console.log(params);
 					var options = {
 						headers: {'Content-Type': 'application/json'},
 						strictSSL: false,
@@ -377,7 +377,7 @@ module.exports = function(RED) {
 						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
 						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
 						data = JSON.parse(body).data.eventPublicationConfig;
-						console.log(data);
+						//console.log(data);
 						msg.payload = {
 							topic: data.customTopicPrefix,
 							onvif: data.appendEventTopic,
