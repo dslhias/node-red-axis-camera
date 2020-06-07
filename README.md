@@ -3,6 +3,7 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 * Get JPEG image snapshot
 * Get/Set properties
 * List/Set user accounts
+* Manage MQTT client including event publishing
 * List/Start/Stop/Install ACAP
 * Restart device
 * List/Create Certificates & Signing requests
@@ -17,3 +18,7 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 
 ### Version 1.0.1
 * Fixed HTTP POST flaw
+
+### Version 1.2.0
+* Added action 'Info' that responds with common needed properties of the camera
+* Added support for managing the built-in MQTT client.  Requires Axis firmware >= 9.80
