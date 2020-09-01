@@ -7,11 +7,15 @@ var exports = module.exports = {};
 exports.request = function( camera, path,callback ) {
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, "VAPIX Request failed");
+			callback( true, "Request error: " + body);
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( true, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		if( body.search("Error") >= 0 ) {
@@ -25,15 +29,15 @@ exports.request = function( camera, path,callback ) {
 exports.post = function( camera, path, data, callback ) {
 	request.post({url: camera.url+path,body: data,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, "VAPIX Post failed" );
+			callback( true, "Request error: " + body);
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request" );
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( true, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		callback(null,body);
@@ -63,7 +67,7 @@ exports.soap = function( camera, soapBody, callback ) {
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request" );
+			callback( true, "Unauthorized request.  CHeck password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
@@ -94,11 +98,15 @@ exports.image = function( camera, mediaProfil, callback ) {
 		path += '?' + mediaProfil;
 	request.get({url:camera.url+path,encoding:null,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, body);
+			callback( true, "Request error: " + body );
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( true, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		callback( null, body );
@@ -114,11 +122,15 @@ exports.getParam = function( camera, paramPath, callback ) {
 //	console.log(path);
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, "VAPIX Parameter Request failed");
+			callback( true, "Code:" + response.statusCode + " " + body );
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( true, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		if( body.search("Error") >= 0 ) {
@@ -190,11 +202,15 @@ exports.setParam = function( camera, group, parameters, callback ) {
 	}
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, "Request error: " + body);
+			callback( true, "Code:" + response.statusCode + " " + body );
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( true, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		if( body.search("Error") === -1 )
@@ -205,14 +221,22 @@ exports.setParam = function( camera, group, parameters, callback ) {
 }
 
 exports.listACAP = function( camera, callback ) {
+	console.log("VAPIX: list acap");
 	var path =  '/axis-cgi/applications/list.cgi';
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, "Request error: " + body);
+			callback( true, "Code:" + response.statusCode + " " + body );
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( true, body );
+			if( !body || body.length === 0 )
+				callback( true, "Code:" + response.statusCode + " " + body );
+			else
+				callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		if( body.search("Error") >= 0 ) {
@@ -225,20 +249,27 @@ exports.listACAP = function( camera, callback ) {
 		});
 		parser.parseString(body, function (err, result) {
 			if( err ) {
-				callback( err,result);
+				console.log("XML parse error");
+				callback( true, "XML parse error");
 				return;
 			}
 			var data = result;
 			if( !data.hasOwnProperty("reply")) {
-				callback( true, "Response parse error.");
+				callback( true, "XML parse error");
 				return;
 			}
 			data = data.reply;
 			if( !data.hasOwnProperty("result") || data.result !== "ok" || !data.hasOwnProperty("application")) {
-				callback( true, "Response parse error.");
+				callback( false, []);
 				return;
 			}
-			callback(null,data.application);
+			if( !Array.isArray(data.application) ) {
+				var list = [];
+				list.push(data.application);
+				callback(false,list);
+				return;
+			}
+			callback(false,data.application);
 		});
 	}).auth(camera.user, camera.password, false);
 }
@@ -248,11 +279,15 @@ exports.installACAP = function( camera, filepath, callback ) {
 	var req = request.post( {url:camera.url+path,strictSSL: false},function (error, response, body) {
 		body = body?body.trim():"";
 		if( error ) {
-			callback( error, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		switch( body ) {
@@ -288,11 +323,15 @@ exports.updateFimrware = function( camera, filepath, callback ) {
 	var req = request.post( {url:camera.url+path,strictSSL: false},function (error, response, body) {
 		body = body?body.trim():"";
 		if( error ) {
-			callback( error, body );
+			callback( true, "Request error: " + body );
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( true, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		callback( false, body );
@@ -316,11 +355,15 @@ exports.controlACAP = function( camera, action, acap, callback ) {
 	var path =  '/axis-cgi/applications/control.cgi?action=' + action + '&package=' + acap;
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, "Request error");
+			callback( true, body );
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		body = body.trim();
@@ -328,10 +371,10 @@ exports.controlACAP = function( camera, action, acap, callback ) {
 			case "OK":
 			case "Error: 6":  //Application is already running
 			case "Error: 7":  //Application is not running
-				callback( null, "OK");
+				callback( false, "OK");
 			break;
 			case "Error: 4":
-				callback( true, "Invalid ACAP " + acap);
+				callback( true, "Invalid ACAP");
 			break;
 			default:
 				callback( true, body );
@@ -344,11 +387,15 @@ exports.listAccounts = function( camera, callback ) {
  	var path =  '/axis-cgi/pwdgrp.cgi?action=get';
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( error, "Request error");
+			callback( true, "Request error: " + body);
+			return;
+		}
+		if( response.statusCode === 401 ) {
+			callback( true, "Unauthorized request.  Check password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
-			callback( response.statusCode, body );
+			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		var accounts = [];
@@ -437,7 +484,7 @@ exports.listCertificates = function( camera, callback ) {
 	var soapBody = '<tds:GetCertificates xmlns="http://www.onvif.org/ver10/device/wsdl"></tds:GetCertificates>';
 	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
-			callback( error, response );
+			callback( true, "Request error: " + body);
 			return;
 		}
 		if( response.hasOwnProperty('tds:GetCertificatesResponse') && response['tds:GetCertificatesResponse'].hasOwnProperty('tds:NvtCertificate')) {
@@ -488,7 +535,7 @@ exports.createCertificate = function( camera, id, certificate, callback ) {
 	soapBody +=	'</acertificates:Subject></acertificates:CreateCertificate2>';
 	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
-			callback(error, response);
+			callback( true, "Request error: " + body);
 			return;
 		}
 		if( response.hasOwnProperty('acertificates:CreateCertificate2Response') && response['acertificates:CreateCertificate2Response'].hasOwnProperty('acertificates:Certificate') ) {
@@ -525,7 +572,7 @@ exports.requestCSR = function( camera, id, certificate, callback ) {
 	soapBody +=	'</acertificates:Subject></acertificates:Subject></acertificates:GetPkcs10Request2>';
 	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
-			callback(error, response);
+			callback( true, "Request error: " + body);
 			return;
 		}
 		if( response.hasOwnProperty('acertificates:GetPkcs10Request2Response') && response['acertificates:GetPkcs10Request2Response'].hasOwnProperty('acertificates:Pkcs10Request') ) {
@@ -570,7 +617,7 @@ exports.listEvents = function( camera, callback ) {
 	var soapBody = '<aev:GetEventInstances xmlns="http://www.axis.com/vapix/ws/event1"></aev:GetEventInstances>';
 	exports.soap( camera, soapBody, function(error, response ) {
 		if( error ) {
-			callback(error,response);
+			callback( true, "Request error: " + body);
 			return;
 		}
 		if( !response.hasOwnProperty('aev:GetEventInstancesResponse') ) {

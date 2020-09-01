@@ -50,6 +50,7 @@ module.exports = function(RED) {
 						msg.error = false;
 						msg.payload = response;
 						if( error ) {
+							msg.payload = response? response.toString():"No response";
 							msg.error = true;
 							node.send( msg );
 							return;
@@ -60,6 +61,7 @@ module.exports = function(RED) {
 							msg.payload = response;
 							if( error ) {
 								msg.error = true;
+								msg.payload = response? response.toString():"No response";
 								node.send( msg );
 								return;
 							}
@@ -80,6 +82,7 @@ module.exports = function(RED) {
 								msg.payload = response;
 								if( error ) {
 									msg.error = true;
+									msg.payload = response? response.toString():"No response";
 									node.send( msg );
 									return;
 								}
@@ -87,7 +90,8 @@ module.exports = function(RED) {
 								if( response.hasOwnProperty("VolatileHostName") )
 									info.hostname = response.VolatileHostName.HostName;
 								info.IPv4 = response.eth0.IPAddress;
-								info.IPv6 = response.eth0.IPv6.IPAddresses;
+								if( response.eth0.hasOwnProperty("IPv6") && response.eth0.IPv6.hasOwnProperty("IPAddresses") )
+									info.IPv6 = response.eth0.IPv6.IPAddresses;
 								info.mac = response.eth0.MACAddress;
 								msg.payload = info;
 								node.send(msg);
@@ -98,7 +102,7 @@ module.exports = function(RED) {
 				
 				case "Image":
 					vapix.image( camera, payload, function(error,response ) {
-						if( error ) {msg.error = true;msg.payload = response.toString();node.send(msg);return;}
+						if( error ) {msg.error = true;msg.payload = response?response.toString():"No response";node.send(msg);return;}
 						msg.error = false;
 						msg.payload = response;
 						if( format === "base64" )
@@ -112,7 +116,7 @@ module.exports = function(RED) {
 					if( format === "binary" || format === "base64" )
 						options.encoding = null;
 					request.get(options, function (error, response, body) {
-						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( error ) {msg.error = true;msg.payload = response?response.toString():"No response";node.send(msg);return;}
 						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
 						msg.payload = body;
 						if( format === "base64")
@@ -139,7 +143,7 @@ module.exports = function(RED) {
 					
 					request.post(options, function (error, response, body) {
 						msg.error = false;
-						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( error ) {msg.error = true;msg.payload = response?response.toString():"No response";node.send(msg);return;}
 						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
 						msg.payload = body;
 						if( format === "base64")
@@ -155,7 +159,7 @@ module.exports = function(RED) {
 				case "Get Properties":
 					vapix.getParam( camera, payload, function( error, response ) {
 						msg.error = false;
-						msg.payload = response;
+						msg.payload = response?response:"No response";
 						if( error )
 							msg.error = true;
 						node.send( msg );
@@ -165,7 +169,7 @@ module.exports = function(RED) {
 				case "Set Properties":
 					vapix.setParam( camera, msg.topic, payload, function(error, response ){
 						msg.error = false;
-						msg.payload = response;
+						msg.payload = response?response:"No response";
 						if( error )
 							msg.error = true;
 						node.send( msg );
@@ -174,7 +178,7 @@ module.exports = function(RED) {
 				
 				case "List Accounts":
 					vapix.listAccounts( camera, function(error, response ) {
-						msg.payload = response;
+						msg.payload = response?response:"No response";
 						msg.error = false;
 						if( error )
 							msg.error = true;
@@ -185,7 +189,7 @@ module.exports = function(RED) {
 				case "Set Account":
 					vapix.setAccount( camera, payload, function(error,response) {
 						msg.error = false;
-						msg.payload = response;
+						msg.payload = response?response:"No response";
 						if( error )
 							msg.error = error;
 						node.send( msg );
@@ -200,7 +204,7 @@ module.exports = function(RED) {
 						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "getClientStatus"})
 					};
 					request.post(options, function (error, response, body) {
-						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+						if( error ) {msg.error = true;msg.payload = response?response.toString():"No response";node.send(msg);return;}
 						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
 						var client = JSON.parse(body).data;
 //						console.log(client.config.lastWillTestament);
@@ -464,20 +468,21 @@ module.exports = function(RED) {
 				
 				case 'List Events':
 					vapix.listEvents( camera, function( error, response ) {
-						msg.error = false;
-						if( error ) {msg.error = true;msg.payload = response;node.send(msg);return;}
 						msg.payload = response;
+						msg.error = false;
+						if( error )
+							msg.error = true;
 						node.send(msg);
 					});
 				break;
 				
 				case 'List ACAP':
+					console.log("List ACAP");
 					vapix.listACAP( camera, function(error, response ) {
 						msg.error = false;
 						msg.payload = response;
 						if( error )
 							msg.error = true;
-						else
 						node.send( msg );
 					});
 				break;
@@ -486,7 +491,8 @@ module.exports = function(RED) {
 					vapix.controlACAP( camera, "start", payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
-						if( error ) {msg.error = true;msg.payload = error;}
+						if( error )
+							msg.error = true;
 						node.send( msg );
 					});
 				break;
@@ -494,7 +500,8 @@ module.exports = function(RED) {
 					vapix.controlACAP( camera, "stop", payload,  function(error, response ) {
 						msg.payload = response;
 						msg.error = false;
-						if( error ) {msg.error = true;msg.payload = error;}
+						if( error )
+							msg.error = true;
 						node.send( msg );
 					});
 				break;
@@ -502,8 +509,10 @@ module.exports = function(RED) {
 				case 'Remove ACAP':
 					vapix.controlACAP( camera, "remove", payload,  function(error, response ) {
 						msg.payload = response;
+						msg.payload = response;
 						msg.error = false;
-						if( error ) {msg.error = true;msg.payload = error;}
+						if( error )
+							msg.error = true;
 						node.send( msg );
 					});
 				break;
@@ -541,20 +550,18 @@ module.exports = function(RED) {
 				case "List Certificates":
 					vapix.listCertificates( camera, function(error, response ) {
 						msg.error = false;
+						msg.payload = response
 						if( error )
 							msg.error = true;
-						else	
-						msg.payload = response
 						node.send(msg);
 					});
 				break;
 				
 				case "Create Certificate":
 					vapix.createCertificate( camera, msg.topic, payload, function(error, response) {
+						msg.error = false;
 						if( error )
 							msg.error = true;
-						else	
-							msg.error = false;
 						msg.payload = response;
 						node.send(msg);
 					});
@@ -562,10 +569,9 @@ module.exports = function(RED) {
 				
 				case "Request CSR":
 					vapix.requestCSR( camera, msg.topic, payload, function(error, response) {
+						msg.error = false;
 						if( error )
 							msg.error = true;
-						else	
-							msg.error = false;
 						msg.payload = response;
 						node.send(msg);
 					});
