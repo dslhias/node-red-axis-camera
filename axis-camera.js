@@ -45,56 +45,136 @@ module.exports = function(RED) {
 			
 			switch( action ) {
 				case "Info":
-					var info = {};
+					msg.error = false;
+					var info = {
+						serial: null,
+						type: "Undefined",
+						model: "Undefined",
+						IPv4: null,
+						IPv6: null,
+						hostname: null,
+						audio: false,
+						platform: null,
+						chipset: null,
+						firmware: null,
+						resolutions: null
+					};
+					//Brand
 					vapix.getParam( camera, "brand", function( error, response ) {
 						msg.error = false;
-						msg.payload = response;
 						if( error ) {
-							msg.payload = response? response.toString():"No response";
 							msg.error = true;
+							msg.payload = {
+								request: "brand",
+								error: error,
+								response: response,
+								device: info
+							}
 							node.send( msg );
 							return;
 						}
-						info.model = response.ProdNbr;
-						vapix.getParam( camera, "properties", function( error, response ) {
-							msg.error = false;
-							msg.payload = response;
+						if( response.hasOwnProperty("ProdNbr") )
+							info.model = response.ProdNbr;
+						if( response.hasOwnProperty("ProdType") )
+							info.type = response.ProdType;
+						vapix.getParam( camera, "network", function( error, response ) {
 							if( error ) {
 								msg.error = true;
-								msg.payload = response? response.toString():"No response";
+								msg.payload = {
+									request: "network",
+									error: error,
+									response: response,
+									device: info
+								}
 								node.send( msg );
 								return;
 							}
-							info.serial = response.System.SerialNumber;
-							info.platform = response.System.Architecture;
-							info.chipset = "";
-							if( response.System.hasOwnProperty("Soc") ) {
-								var items = response.System.Soc.split(' ');
-								if( items.length > 1 )
-									info.chipset = items[1];
-								else
-									info.chipset = response.System.Soc;
+							if( response.hasOwnProperty("HostName") )
+								info.hostname = response.HostName;
+							if( response.hasOwnProperty("VolatileHostName") )
+								info.hostname = response.VolatileHostName.HostName;
+							if( response.hasOwnProperty("eth0") ) {
+								if( response.eth0.hasOwnProperty("IPAddress") )
+									info.IPv4 = response.eth0.IPAddress;
+								if( response.eth0.hasOwnProperty("IPv6") && response.eth0.IPv6.hasOwnProperty("IPAddresses") )
+									info.IPv6 = response.eth0.IPv6.IPAddresses;
+								if( response.eth0.hasOwnProperty("MACAddress") )
+									info.mac = response.eth0.MACAddress;
 							}
-							info.firmware = response.Firmware.Version;
-							info.resolution = response.Image.Resolution.split(',')[0];
-							vapix.getParam( camera, "network", function( error, response ) {
-								msg.error = false;
-								msg.payload = response;
+							//Properties
+							vapix.getParam( camera, "properties", function( error, response ) {
 								if( error ) {
 									msg.error = true;
-									msg.payload = response? response.toString():"No response";
+									msg.payload = {
+										request: "properties",
+										error: error,
+										response: response,
+										device: info
+									}
 									node.send( msg );
 									return;
 								}
-								info.hostname = response.HostName;
-								if( response.hasOwnProperty("VolatileHostName") )
-									info.hostname = response.VolatileHostName.HostName;
-								info.IPv4 = response.eth0.IPAddress;
-								if( response.eth0.hasOwnProperty("IPv6") && response.eth0.IPv6.hasOwnProperty("IPAddresses") )
-									info.IPv6 = response.eth0.IPv6.IPAddresses;
-								info.mac = response.eth0.MACAddress;
-								msg.payload = info;
-								node.send(msg);
+								if( response.hasOwnProperty("Firmware") && response.Firmware.hasOwnProperty("Version"))
+									info.firmware = response.Firmware.Version;
+								if( response.hasOwnProperty("System") ) {
+									if(  response.System.hasOwnProperty("SerialNumber") )
+										info.serial = response.System.SerialNumber;
+									if( response.System.hasOwnProperty("Architecture") )
+										info.platform = response.System.Architecture;
+									if( response.System.hasOwnProperty("Soc") ) {
+										var items = response.System.Soc.split(' ');
+										if( items.length > 1 )
+											info.chipset = items[1];
+										else
+											info.chipset = response.System.Soc;
+									}
+								}
+								if( response.hasOwnProperty("Audio") && response.Audio.hasOwnProperty("Audio") )
+									info.audio = response.Audio.Audio;
+
+								if( response.hasOwnProperty("Image") && response.Image.hasOwnProperty("Resolution") ) {
+									resolutions =  response.Image.Resolution.split(',');
+									info.resolutions = {
+										list: resolutions,
+										max: resolutions.length>1?resolutions[0]:null,
+										min: resolutions.length>1?resolutions[resolutions.length-1]:null,
+										med: "640x360",	
+										aspect: "16:9",
+										rotation: 0
+									}
+									vapix.getParam( camera, "ImageSource.I0", function( error, response ) {
+										if( error ) {
+											msg.error = true;
+											msg.payload = {
+												request: "ImageSource",
+												error: error,
+												response: response,
+												device: info
+											}
+											node.send(msg);
+											return;
+										}
+									
+										if( response && response.hasOwnProperty("I0") ) { 
+											if( response.I0.hasOwnProperty("Sensor") && response.I0.Sensor.hasOwnProperty("AspectRatio") ) {
+												info.resolutions.aspect  = response.I0.Sensor.AspectRatio;
+												if( info.resolutions.aspect === "4:3")
+													info.resolutions.med = "640x480";
+												if( info.resolutions.aspect === "1:1")
+													info.resolutions.med = "640x640";
+												if( info.resolutions.aspect === "16:10")
+													info.resolutions.med = "640x400";
+											}
+											if( response.I0.hasOwnProperty("Rotation") )
+												info.resolutions.rotation = parseInt(response.I0.Rotation);
+										}
+										msg.payload = info;
+										node.send( msg );
+									});
+								} else {
+									msg.payload = info;
+									node.send( msg );
+								}
 							});
 						});
 					});
@@ -102,7 +182,12 @@ module.exports = function(RED) {
 				
 				case "Image":
 					vapix.image( camera, payload, function(error,response ) {
-						if( error ) {msg.error = true;msg.payload = response?response.toString():"No response";node.send(msg);return;}
+						if( error ) {
+							msg.error = true;
+							msg.payload = response?response.toString():"No response";
+							node.send(msg);
+							return;
+						}
 						msg.error = false;
 						msg.payload = response;
 						if( format === "base64" )
@@ -143,8 +228,17 @@ module.exports = function(RED) {
 					
 					request.post(options, function (error, response, body) {
 						msg.error = false;
-						if( error ) {msg.error = true;msg.payload = response?response.toString():"No response";node.send(msg);return;}
-						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+						if( error ) {
+							msg.error = true;
+							msg.payload = response?response.toString():"No response";
+							node.send(msg);return;
+						}
+						if( response.statusCode !== 200 ) {
+							msg.error=true;
+							msg.payload = body.toString();
+							node.send(msg);
+							return;
+						}
 						msg.payload = body;
 						if( format === "base64")
 							msg.payload = body.toString('base64');

@@ -13,6 +13,11 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 * Update Firmware
 
 ## Changelog
+
+### Version 1.3.1
+* Fixed a bug that could result in a crash when requesting Info
+* Added more information in Info including device type, audio support and supported resolutions.
+
 ### Version 1.3.0
 * Fixed a bug in action Info that could crash Node-Red
 * Action ACAP list will now respond with an array and not an object if only one ACAP is installed.

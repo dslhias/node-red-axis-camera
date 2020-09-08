@@ -33,7 +33,7 @@ exports.post = function( camera, path, data, callback ) {
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
+			callback( true, "Unauthorized request.  Check user and password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
@@ -67,7 +67,7 @@ exports.soap = function( camera, soapBody, callback ) {
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  CHeck password" );
+			callback( true, "Unauthorized request.  Check user and password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
@@ -102,7 +102,11 @@ exports.image = function( camera, mediaProfil, callback ) {
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
+			callback( true, "Unauthorized request.  Check user and password" );
+			return;
+		}
+		if( response.statusCode === 400 ) {
+			callback( true, "Invalid request.  Check if the resolution is supported by device" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
@@ -122,11 +126,11 @@ exports.getParam = function( camera, paramPath, callback ) {
 //	console.log(path);
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
+			callback( true, error );
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
+			callback( true, "Unauthorized request.  Check user and password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
@@ -202,11 +206,11 @@ exports.setParam = function( camera, group, parameters, callback ) {
 	}
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
+			callback( true, error );
 			return;
 		}
 		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
+			callback( true, "Unauthorized request.  Check user and password" );
 			return;
 		}
 		if( response.statusCode !== 200 ) {
@@ -225,7 +229,7 @@ exports.listACAP = function( camera, callback ) {
 	var path =  '/axis-cgi/applications/list.cgi';
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
+			callback( true, error );
 			return;
 		}
 		if( response.statusCode === 401 ) {
@@ -279,7 +283,7 @@ exports.installACAP = function( camera, filepath, callback ) {
 	var req = request.post( {url:camera.url+path,strictSSL: false},function (error, response, body) {
 		body = body?body.trim():"";
 		if( error ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
+			callback( true, error );
 			return;
 		}
 		if( response.statusCode === 401 ) {
@@ -355,7 +359,7 @@ exports.controlACAP = function( camera, action, acap, callback ) {
 	var path =  '/axis-cgi/applications/control.cgi?action=' + action + '&package=' + acap;
 	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
 		if( error ) {
-			callback( true, body );
+			callback( true, error );
 			return;
 		}
 		if( response.statusCode === 401 ) {
