@@ -15,6 +15,10 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 ## Changelog
 
 ### Version 1.3.1
+* Fixed a bug in action MQTT Connect that prevented CA certificate validation.
+* Fixed a bug in MQTT Client where property connected was always false while connected.
+
+### Version 1.3.1
 * Fixed a bug that could result in a crash when requesting Info
 * Added more information in Info including device type, audio support and supported resolutions.
 

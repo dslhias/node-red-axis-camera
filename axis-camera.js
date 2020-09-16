@@ -305,7 +305,7 @@ module.exports = function(RED) {
 						msg.payload = {
 							active: client.status.state === "active",
 							status: client.status.connectionStatus, //connected, connecting, failed, disconnected
-							connected: client.status.connectionStatus === "Connected",
+							connected: client.status.connectionStatus === "connected",
 							host: client.config.server.host,
 							port: client.config.server.port.toString(),
 							id: client.config.clientId,
@@ -393,7 +393,10 @@ module.exports = function(RED) {
 					}
 
 					if( settings.hasOwnProperty("tls") )
-						tls = settings.tls === true;
+						tls = settings.tls;
+
+					if( settings.hasOwnProperty("validateCertificate")  )
+						validateCertificate = settings.validateCertificate;
 
 					var params = {
 							activateOnReboot: true,
