@@ -1,120 +1,100 @@
-var fs = require("fs");
-var request = require('request');
-var xml2js = require('xml2js');
+const fs = require("fs");
+const xml2js = require('xml2js');
+const got = require("got");
+const digestAuth = require("@mreal/digest-auth");
+const FormData = require("form-data");
 
 var exports = module.exports = {};
 
-exports.request = function( camera, path,callback ) {
-	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
-		if( error ) {
-			callback( true, "Request error: " + body);
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
-			return;
-		}
-		if( body.search("Error") >= 0 ) {
-			callback( true, body);
-			return;
-		}
-		callback( false, body );
-	}).auth( camera.user, camera.password, false);
-}
-
-exports.post = function( camera, path, data, callback ) {
-	request.post({url: camera.url+path,body: data,strictSSL: false}, function (error, response, body) {
-		if( error ) {
-			callback( true, "Request error: " + body);
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check user and password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
-			return;
-		}
-		callback(null,body);
-	}).auth(camera.user, camera.password, false);
-}
-
-exports.soap = function( camera, soapBody, callback ) {
-	var soapEnvelope = '<SOAP-ENV:Envelope ' +
-					   'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '+
-					   'xmlns:xsd="http://www.w3.org/2001/XMLSchema" '+
-					   'xmlns:tt="http://www.onvif.org/ver10/schema "'+
-					   'xmlns:tds="http://www.onvif.org/ver10/device/wsdl" '+
-					   'xmlns:tev="http://www.onvif.org/ver10/event/wsdl" '+
-					   'xmlns:tns1="http://www.onvif.org/ver10/topics" ' +
-	                   'xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" '+
-					   'xmlns:acertificates="http://www.axis.com/vapix/ws/certificates" '+
-					   'xmlns:acert="http://www.axis.com/vapix/ws/cert" '+
-					   'xmlns:aev="http://www.axis.com/vapix/ws/event1" ' +
-					   'xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">';
-					   
-	soapEnvelope += '<SOAP-ENV:Body>' + soapBody + '</SOAP-ENV:Body>';
-	soapEnvelope += '</SOAP-ENV:Envelope>';
-	
-	request.post({url: camera.url+'/vapix/services',body: soapEnvelope,strictSSL: false}, function (error, response, body) {
-		if( error ) {
-			callback( true, "Soap request error" );
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check user and password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			parseSOAPResponse( body,
-				function(result){ //success
-					callback(true,result);
-				},
-				function(result) { //
-					callback(true,"Soap Parse error");
+function DigestClient( username, password ) {
+	return got.extend({
+		hooks:{
+			afterResponse: [
+				(res, retry) => {
+					const options = res.request.options;
+					const digestHeader = res.headers["www-authenticate"];
+					if (!digestHeader){
+						console.error("Camera Get: Response contains no digest header");
+						return res;
+					}
+					const incomingDigest = digestAuth.ClientDigestAuth.analyze(	digestHeader );
+					const digest = digestAuth.ClientDigestAuth.generateProtectionAuth( incomingDigest, username, password,{
+						method: options.method,
+						uri: options.url.pathname,
+						counter: 1
+					});
+					options.headers.authorization = digest.raw;
+					return retry(options);
 				}
-			)
-			return;
+			]
 		}
-		parseSOAPResponse( body,
-			function(result){ //success
-				callback(false,result);
-			},
-			function(result) {
-				callback(true,result);
-			}
-		)
-	}).auth(camera.user, camera.password, false);
+	});
+}
+
+exports.get = function( camera, path, callback ) {
+	(async () => {
+		try {
+			const client = DigestClient( camera.user, camera.password);
+			const response = await client.get( camera.url + path,{
+				https:{rejectUnauthorized: false}
+			});
+			callback(false, response.body );
+		} catch (error) {
+			console.log("HTTP GET Error:", error);
+			callback(true, error );
+		}
+	})();
+}
+
+exports.postJSON = function( camera, path, body, callback ) {
+	var json = body;
+	if( typeof body === 'string' )
+		json = JSON.parse( body );
+	(async () => {
+		try {
+			const client = DigestClient( camera.user, camera.password );
+			const response = await client.post( camera.url + path, {
+				json: json,
+				https: {rejectUnauthorized: false},
+				 responseType: 'json'
+			});
+			callback(false, response.body );
+		} catch (error) {
+			console.log("Post JSON Error:",error);
+			callback(true, error );
+		}
+	})();
+}
+
+exports.postBody = function( camera, path, body, callback ) {
+	(async () => {
+		try {
+			const client = DigestClient( camera.user, camera.password );
+			const response = await client.post( camera.url + path, {
+				body: body,
+				https: {rejectUnauthorized: false}
+			});
+			callback(false, response.body );
+		} catch (error) {
+			console.log("postBody error:" ,error);
+			callback(true, error );
+		}
+	})();
 }
 
 exports.image = function( camera, mediaProfil, callback ) {
 	path = '/axis-cgi/jpg/image.cgi';
 	if( mediaProfil && mediaProfil.length > 3 )
 		path += '?' + mediaProfil;
-	request.get({url:camera.url+path,encoding:null,strictSSL: false}, function (error, response, body) {
-		if( error ) {
-			callback( true, "Request error: " + body );
-			return;
+	(async () => {
+		try {
+			const client = DigestClient( camera.user, camera.password);
+			const response = await client.get( camera.url + path,{responseType:"buffer",https:{rejectUnauthorized: false}});
+			callback(false, response.body );
+		} catch (error) {
+			callback(true, error );
 		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check user and password" );
-			return;
-		}
-		if( response.statusCode === 400 ) {
-			callback( true, "Invalid request.  Check if the resolution is supported by device" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
-			return;
-		}
-		callback( null, body );
-	}).auth( camera.user, camera.password, false);
+	})();
 }
 
 exports.getParam = function( camera, paramPath, callback ) {
@@ -122,19 +102,9 @@ exports.getParam = function( camera, paramPath, callback ) {
 		callback(true,"Invalid parameter path.  Set data to a valid parameter group" );
 		return;
 	}
-	var path = '/axis-cgi/param.cgi?action=list&group=' + paramPath
-//	console.log(path);
-	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
+	exports.get( camera, '/axis-cgi/param.cgi?action=list&group=' + paramPath, function( error, body ) {
 		if( error ) {
 			callback( true, error );
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check user and password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		if( body.search("Error") >= 0 ) {
@@ -143,7 +113,7 @@ exports.getParam = function( camera, paramPath, callback ) {
 		}
 		var params = ParseVapixParameter(body);
 		callback( false, params );
-	}).auth( camera.user, camera.password, false);
+	});
 }
 
 function ParseVapixParameter( data ) {
@@ -177,7 +147,6 @@ function ParseVapixParameter( data ) {
 			}
 		}
 	});
-	
 	return result;
 }
 
@@ -204,202 +173,30 @@ exports.setParam = function( camera, group, parameters, callback ) {
 			path += '&root.' + group + '.' + parameter + '=' + encodeURIComponent(value);
 		}
 	}
-	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
+	
+	exports.get( camera, path, function( error, body ) {
 		if( error ) {
 			callback( true, error );
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check user and password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
-			return;
-		}
-		if( body.search("Error") === -1 )
-			callback( false, "OK");
-		else
-			callback( true, body);
-	}).auth(camera.user, camera.password, false);
-}
-
-exports.listACAP = function( camera, callback ) {
-	console.log("VAPIX: list acap");
-	var path =  '/axis-cgi/applications/list.cgi';
-	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
-		if( error ) {
-			callback( true, error );
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			if( !body || body.length === 0 )
-				callback( true, "Code:" + response.statusCode + " " + body );
-			else
-				callback( true, "Code:" + response.statusCode + " " + body );
 			return;
 		}
 		if( body.search("Error") >= 0 ) {
-			callback( true, body );
-			return;
-		}
-		var parser = new xml2js.Parser({
-			explicitArray: false,
-			mergeAttrs: true
-		});
-		parser.parseString(body, function (err, result) {
-			if( err ) {
-				console.log("XML parse error");
-				callback( true, "XML parse error");
-				return;
-			}
-			var data = result;
-			if( !data.hasOwnProperty("reply")) {
-				callback( true, "XML parse error");
-				return;
-			}
-			data = data.reply;
-			if( !data.hasOwnProperty("result") || data.result !== "ok" || !data.hasOwnProperty("application")) {
-				callback( false, []);
-				return;
-			}
-			if( !Array.isArray(data.application) ) {
-				var list = [];
-				list.push(data.application);
-				callback(false,list);
-				return;
-			}
-			callback(false,data.application);
-		});
-	}).auth(camera.user, camera.password, false);
-}
-
-exports.installACAP = function( camera, filepath, callback ) {
-	var path = '/axis-cgi/applications/upload.cgi'
-	var req = request.post( {url:camera.url+path,strictSSL: false},function (error, response, body) {
-		body = body?body.trim():"";
-		if( error ) {
-			callback( true, error );
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
-			return;
-		}
-		switch( body ) {
-			case "OK":
-				callback( false, "OK" );
-			break;
-			case "Error: 1":
-				callback( true, "Invalid file type" );
-			break;
-			case "Error: 2":
-				callback( true, "File verification failed" );
-			break;
-			case "Error: 3":
-				callback( true, "File is too large or the storage is full" );
-			break;
-			case "Error: 5":
-			case "Error: 10":
-				callback( true, "File is not compatible with the HW or FW" );
-			break;
-			default:
-				callback( true, body );
-			break;
-		}
-	}).auth(camera.user, camera.password, false);
-	var form = req.form();
-	form.append('file',fs.createReadStream(filepath));
-}
-
-exports.updateFimrware = function( camera, filepath, callback ) {
-//	var path = '/axis-cgi/firmwaremanagement.cgi'
-	var path = '/axis-cgi/firmwareupgrade.cgi'
-//	var url = address + '/axis-cgi/packagemanager.cgi'
-	var req = request.post( {url:camera.url+path,strictSSL: false},function (error, response, body) {
-		body = body?body.trim():"";
-		if( error ) {
-			callback( true, "Request error: " + body );
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
+			callback( true, body);
 			return;
 		}
 		callback( false, body );
-	}).auth(camera.user, camera.password, false);
-	var form = req.form();
-	form.append('file',fs.createReadStream(filepath));
+	});
 }
 
 
-exports.controlACAP = function( camera, action, acap, callback ) {
-	if( !action || action.length == 0 ) {
-		callback( true, "Invalid ACAP action");
-		return;
-	}
-	
-	if( !acap || acap.length == 0 || acap.length > 20 ) {
-		callback( true, "Invalid ACAP ID");
-		return;
-	}
-	
-	var path =  '/axis-cgi/applications/control.cgi?action=' + action + '&package=' + acap;
-	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
+exports.listAccounts = function( camera, callback ) {
+	exports.get( camera, '/axis-cgi/pwdgrp.cgi?action=get', function( error, body ) {
 		if( error ) {
 			callback( true, error );
 			return;
 		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
-			return;
-		}
-		body = body.trim();
-		switch( body ) {
-			case "OK":
-			case "Error: 6":  //Application is already running
-			case "Error: 7":  //Application is not running
-				callback( false, "OK");
-			break;
-			case "Error: 4":
-				callback( true, "Invalid ACAP");
-			break;
-			default:
-				callback( true, body );
-			break;
-		}
-	}).auth(camera.user, camera.password, false);
-}
-
-exports.listAccounts = function( camera, callback ) {
- 	var path =  '/axis-cgi/pwdgrp.cgi?action=get';
-	request.get({url:camera.url+path,strictSSL: false}, function (error, response, body) {
-		if( error ) {
-			callback( true, "Request error: " + body);
-			return;
-		}
-		if( response.statusCode === 401 ) {
-			callback( true, "Unauthorized request.  Check password" );
-			return;
-		}
-		if( response.statusCode !== 200 ) {
-			callback( true, "Code:" + response.statusCode + " " + body );
+		
+		if( body.search("Error") >= 0 ) {
+			callback( true, body);
 			return;
 		}
 		var accounts = [];
@@ -445,7 +242,7 @@ exports.listAccounts = function( camera, callback ) {
 			})    
 		})
 		callback( false, list );
-	}).auth(camera.user, camera.password, false);
+	});
 }
 
 exports.setAccount = function( camera, account, callback ) {
@@ -463,32 +260,629 @@ exports.setAccount = function( camera, account, callback ) {
 	}
 	
 	var path = '/axis-cgi/pwdgrp.cgi?action=update&user=' + account.user + '&pwd=' + encodeURIComponent(account.password);
-	exports.request( camera,path, function( error, response ) {	
+	exports.get( camera, path, function( error, response ) {
 		if( error ) {
+			callback(true, response);
+			return;
+		}
+		if( response.search("Error") >= 0 ) {
 			var sgrp = "viewer";
 			if( account.privileges==="Operator" )
 				sgrp += ":operator:ptz";
 			if( account.privileges==="Administrator" )
 				sgrp += ":operator:admin:ptz";
 			path = '/axis-cgi/pwdgrp.cgi?action=add&user=' + account.user + '&pwd=' + encodeURIComponent(account.password) + '&grp=users&sgrp=' + sgrp + '&comment=node';
-			exports.request( camera,path, function( error, response ) {	
+			exports.get( camera, path, function( error, response ) {	
 				if( error ) {
-					callback( error, response );
+					callback( true, response );
 					return;
 				}
-				callback( null, response );
+				if( response.search("Error") >= 0 ) {
+					callback( true, "Unable to create or update account" );
+					return;
+				}
+				callback( false, "OK" );
+				return;
 			});
 			return;
 		}
-		callback( false, response );
+		callback( false, "OK" );
 	});
 }
+
+exports.removeAccount = function( camera, accountName, callback ) {
+	var path  = "/axis-cgi/pwdgrp.cgi?action=remove&user=" + accountName;
+	exports.get( camera, path, function( error, response ) {
+		if( error ) {
+			callback(true, response );
+			return;
+		}
+		if( response.search("Error") >= 0 ) {
+			callback( true, "Unable to remove account");
+			return;
+		}
+		callback(false,"OK");
+	});
+}
+
+exports.mqttClientStatus = function( camera, callback ) {
+	var json = {
+		apiVersion: "1.0",
+		context: "Node-Red",
+		method: "getClientStatus"
+	};
+	exports.postJSON( camera, "/axis-cgi/mqtt/client.cgi", json, function(error, response) {
+		if( error ) {
+			callback( true, response );
+			return;
+		}
+		
+		var client = response.data;
+		var processedClient = {
+			active: client.status.state === "active",
+			status: client.status.connectionStatus, //connected, connecting, failed, disconnected
+			connected: client.status.connectionStatus === "connected",
+			host: client.config.server.host,
+			port: client.config.server.port.toString(),
+			id: client.config.clientId,
+			tls: client.config.server.protocol === "ssl",
+			validateCertificate: client.config.ssl.validateServerCert,
+			user: client.config.username,
+			password: '********',
+			lastWillTestament: null,
+			announcement: null
+		}
+		if( client.config.hasOwnProperty("lastWillTestament") ) {
+			if( client.config.lastWillTestament.useDefault ) {
+				processedClient.lastWillTestament = {
+					topic: "default",
+					payload: "default"
+				}
+			} else {
+				processedClient.lastWillTestament = {
+					topic: client.config.lastWillTestament.topic,
+					payload: JSON.parse(client.config.lastWillTestament.message)
+				}
+			}
+		}
+		if( client.config.hasOwnProperty("connectMessage") ) {
+			if( client.config.connectMessage.useDefault ) {
+				processedClient.announcement = {
+					topic: "default",
+					payload: "default"
+				}
+			} else {
+				processedClient.announcement = {
+					topic: client.config.connectMessage.topic,
+					payload: JSON.parse(client.config.connectMessage.message)
+				}
+			}
+		}
+		callback(false, processedClient );
+	});
+}
+
+
+exports.mqttConnect = function( camera, settings, callback ) {
+	if( settings === null || settings === false ) {  //Disconnect request
+		exports.postJSON( camera, "/axis-cgi/mqtt/client.cgi",
+			{
+				apiVersion: "1.0",
+				context: "Node-Red",
+				method: "deactivateClient"
+			},
+			function(error, response) {
+				if( error ) {
+					callback( true, response );
+					return;
+				}
+				callback( false, "MQTT Client deactivated");
+			}
+		);
+		return;
+	}
+	
+					
+	if( !settings.hasOwnProperty("host") || settings.host.length === 0 ) {
+		callback( true, "Invalid host");
+		return;
+	}
+
+	if( !settings.hasOwnProperty("port") || settings.port.length === 0 ) {
+		callback( true, "Invalid port");
+		return;
+	}
+					
+	if( !settings.hasOwnProperty("id") || settings.id.length === 0 ) {
+		callback( true, "Invalid client ID");
+		return;
+	}
+	var user = "";
+	var password = "";
+	var tls = false;
+	var validateCertificate = false;
+
+	if( settings.hasOwnProperty("tls") )
+		tls = settings.tls;
+
+	if( settings.hasOwnProperty("validateCertificate")  )
+		validateCertificate = settings.validateCertificate;
+
+	var params = {
+		activateOnReboot: true,
+		server: {
+			protocol: tls?"ssl":"tcp",
+			host: settings.host,
+			port: parseInt(settings.port),
+			//"basepath":"url-extension"
+		},
+		ssl: {
+			validateServerCert: validateCertificate
+		},
+		username: settings.user || "",
+		password: settings.password || "",
+		clientId: settings.id,
+		keepAliveInterval: 60,
+		connectTimeout: 60,	
+		cleanSession: true,
+		autoReconnect: true
+	}
+					
+	if( settings.hasOwnProperty("lastWillTestament") && settings.lastWillTestament !== null && settings.lastWillTestament !== false ) {
+		params.lastWillTestament = {
+			useDefault: false,
+			topic: settings.lastWillTestament.topic,
+			message: settings.lastWillTestament.payload,
+			retain: true,
+			qos: 1							
+		}
+		//console.log(settings.lastWillTestament.payload);
+		if( typeof settings.lastWillTestament.payload === 'object' )
+			params.lastWillTestament.message = JSON.stringify(settings.lastWillTestament.payload);
+		params.disconnectMessage = JSON.parse(JSON.stringify(params.lastWillTestament));
+	}
+	
+	if( settings.hasOwnProperty("announcement") && settings.announcement !== null && settings.announcement !== false ) {
+		params.connectMessage = {
+			useDefault: false,
+			topic: settings.announcement.topic,
+			message: settings.announcement.payload,
+			retain: true,
+			qos: 1							
+		}
+		if( typeof settings.announcement.payload === 'object' )
+			params.connectMessage.message = JSON.stringify(settings.announcement.payload);
+	}
+	
+	exports.postJSON( camera, "/axis-cgi/mqtt/client.cgi",
+		{
+			apiVersion: "1.0",
+			context: "Node-Red",
+			method: "configureClient",
+			params: params
+		},
+		function(error, response) {
+			if( error ) { callback( true, response ); return; }
+			exports.postJSON( camera, "/axis-cgi/mqtt/client.cgi",
+				{
+					apiVersion: "1.0",
+					context: "Node-Red",
+					method: "activateClient"
+				},
+				function(error, response) {
+					if( error ) { callback( true, response ); return; }
+					callback( false, "MQTT configured");
+				}
+			);
+		}
+	);
+}
+
+
+exports.mqttGetPublishing = function( camera, callback ) {
+	exports.postJSON( camera, "/axis-cgi/mqtt/event.cgi",
+		{
+			apiVersion: "1.0",
+			context: "Node-Red",
+			method: "getEventPublicationConfig"
+		},
+		function(error, response) {
+			if( error ) {
+				callback( true, response );
+				return;
+			}
+			var processedResponse = {
+				topic: response.customTopicPrefix,
+				onvif: response.appendEventTopic,
+				events: []
+			}
+			for( var i = 0; i < response.eventFilterList.length; i++ )
+				msg.payload.events.push(data.eventFilterList[i].topicFilter);
+			callback( false, response);
+		}
+	);
+	
+	
+	var options = {
+		headers: {'Content-Type': 'application/json'},
+		strictSSL: false,
+		url: camera.url + "/axis-cgi/mqtt/event.cgi",
+		body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "getEventPublicationConfig"})
+	};
+	request.post(options, function (error, response, body) {
+		if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+		if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+		node.send(msg);
+	}).auth( camera.user, camera.password, false);
+}
+
+exports.mqttSetPublishing = function( camera, settings, callback ) {
+	if( !settings.hasOwnProperty("topic") ) {
+		msg.error = true;
+		msg.payload = "Topic needs to be set";
+		node.send(msg);
+		return;
+	}
+	if( !settings.hasOwnProperty("events") ) {
+		msg.error = true;
+		msg.payload = "Events needs to be set";
+		node.send(msg);
+		return;
+	}
+	if( !Array.isArray(settings.events) )
+		settings.events = [];
+	var list = [];
+	for( var i = 0; i < settings.events.length; i++ ) {
+		list.push( {
+			topicFilter: settings.events[i],
+			qos: 0,
+			retain: "none"
+		});
+	}
+	params = {
+		eventFilterList:list,
+		topicPrefix: "custom",
+		customTopicPrefix: settings.topic,
+		appendEventTopic: settings.onvif || false,
+		includeTopicNamespaces : false,
+		includeSerialNumberInPayload: true
+	};
+	var options = {
+		headers: {'Content-Type': 'application/json'},
+		strictSSL: false,
+		url: camera.url + "/axis-cgi/mqtt/event.cgi",
+		body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "configureEventPublication",params:params})
+	};
+	request.post(options, function (error, response, body) {
+		if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
+		if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
+		msg.payload = "OK";
+		node.send(msg);
+	}).auth( camera.user, camera.password, false);
+}
+
+exports.listACAP = function( camera, callback ) {
+	exports.get( camera, '/axis-cgi/applications/list.cgi', function( error, response )	{
+		if( error ) {
+			callback( true, response );
+			return;
+		}
+		if( response.search("Error") >= 0 ) {
+			callback( true, response );
+			return;
+		}
+		var parser = new xml2js.Parser({
+			explicitArray: false,
+			mergeAttrs: true
+		});
+		
+		parser.parseString(response, function (err, result) {
+			if( err ) {
+				callback( true, "XML parse error");
+				return;
+			}
+			var data = result;
+			if( !data.hasOwnProperty("reply")) {
+				callback( true, "XML parse error");
+				return;
+			}
+			data = data.reply;
+			if( !data.hasOwnProperty("result") || data.result !== "ok" || !data.hasOwnProperty("application")) {
+				callback( false, []);
+				return;
+			}
+			if( !Array.isArray(data.application) ) {
+				var list = [];
+				list.push(data.application);
+				callback(false,list);
+				return;
+			}
+			callback(false,data.application);
+		});
+	});
+}
+
+
+exports.controlACAP = function( camera, action, acapID, callback ) {
+	if( !action || action.length == 0 ) {
+		callback( true, "Invalid ACAP control action");
+		return;
+	}
+	
+	if( !acapID || acapID.length == 0 || acapID.length > 20 ) {
+		callback( true, "Invalid ACAP ID");
+		return;
+	}
+	
+	var path =  '/axis-cgi/applications/control.cgi?action=' + action + '&package=' + acapID;
+	exports.get( camera, path, function(error, response) {
+		if( error ) {
+			callback( true, response );
+			return;
+		}
+		response = response.trim();
+		switch( response ) {
+			case "OK":
+			case "Error: 6":  //Application is already running
+			case "Error: 7":  //Application is not running
+				callback( false, "OK");
+			break;
+			case "Error: 4":
+				callback( true, "Invalid ACAP");
+			break;
+			default:
+				callback( true, response );
+			break;
+		}
+	});
+}
+
+
+function Digest_ACAP_Form_Upload(filePath, username, password) {
+	return got.extend({
+		hooks:{
+			afterResponse: [
+				(res, retry) => {
+					const options = res.request.options;
+					const digestHeader = res.headers["www-authenticate"];
+					if (!digestHeader){
+						console.error("Firmware update: Response contains no digest header");
+						return res;
+					}
+					const incomingDigest = digestAuth.ClientDigestAuth.analyze(	digestHeader );
+					const digest = digestAuth.ClientDigestAuth.generateProtectionAuth( incomingDigest, username, password,{
+						method: options.method,
+						uri: options.url.pathname,
+						counter: 1
+					});
+					const form = new FormData();
+					form.append(
+						"data",
+						'{"apiVersion": "1.0", "context": "nodered", "method": "install"}',
+						{
+							filename: "blob",
+							contentType: "application/json",
+						}
+					);
+					form.append(
+						"fileData",
+						fs.createReadStream(filePath),
+						{
+							filename: 'acap.eap',
+							contentType: "application/octet-stream"
+						}
+					);
+					options.headers = form.getHeaders();
+					options.headers.authorization = digest.raw;
+					options.body = form;
+					return retry(options);
+				}
+			]
+		}
+	});
+}
+
+exports.installACAP = function( camera, filepath, callback ) {
+	(async () => {
+		try {
+			const client = Digest_ACAP_Form_Upload( filepath, camera.user, camera.password);
+			const url = camera.url + '/axis-cgi/packagemanager.cgi';
+			const response = await client.post(url);
+			var json = JSON.parse( response.body );
+			if( json.hasOwnProperty("error") )
+				callback(true, json.error );
+			else
+				callback(false, json.data );
+		} catch (error) {
+			console.log(error);
+			callback(true, error );
+		}
+	})();	
+}
+
+exports.listConnections = function( camera, callback ) {
+	exports.get( camera, '/axis-cgi/admin/connection_list.cgi?action=get', function(error, response) {
+		if( error ) {
+			callback( true, response );
+			return;
+		}
+		var rows = response.split('\n');
+		var list = [];
+		for( var i = 1; i < rows.length; i++) {
+			var row = rows[i].trim();
+			row = row.replace(/\s{2,}/g, ' ');
+			if( row.length > 10 ) {
+				var items = row.split(' ');
+				var ip = items[0].split('.');
+				if( ip != '127' ) {
+					list.push({
+						address: items[0],
+						protocol: items[1],
+						port: items[2],
+						service: items[3].split('/')[1]
+					})
+				}
+			}
+		}
+		callback( false, list );
+	});
+}
+
+exports.restart = function( camera, callback ) {
+	exports.get( camera, '/axis-cgi/admin/connection_list.cgi?action=get', function(error, response) {
+		if( error ) {
+			callback( true, response );
+			return;
+		}
+		callback( false, "Device Restarted" );
+	});
+}
+
+function SetupFirmwareUpdate(filePath, username, password) {
+	return got.extend({
+		hooks:{
+			afterResponse: [
+				(res, retry) => {
+					const options = res.request.options;
+					const digestHeader = res.headers["www-authenticate"];
+					if (!digestHeader){
+						console.error("Firmware update: Response contains no digest header");
+						return res;
+					}
+					const incomingDigest = digestAuth.ClientDigestAuth.analyze(	digestHeader );
+					const digest = digestAuth.ClientDigestAuth.generateProtectionAuth( incomingDigest, username, password,{
+						method: options.method,
+						uri: options.url.pathname,
+						counter: 1
+					});
+					const form = new FormData();
+					form.append(
+						"data",
+						'{"apiVersion": "1.0", "context": "nodered", "method": "upgrade"}',
+						{
+							filename: "blob",
+							contentType: "application/json",
+						}
+					);
+					form.append(
+						"fileData",
+						fs.createReadStream(filePath),
+						{
+							filename: 'firmware.bin',
+							contentType: "application/octet-stream"
+						}
+					);
+					options.headers = form.getHeaders();
+					options.headers.authorization = digest.raw;
+					options.body = form;
+					return retry(options);
+				}
+			]
+		}
+	});
+}
+
+function parseSOAPResponse( xml, success, failure ) {
+	var parser = new xml2js.Parser({
+		explicitArray: false,
+		mergeAttrs: true
+	});
+
+	parser.parseString(xml, function (err, result) {
+		if( err ) {
+			failure( err );
+			return;
+		}
+		if( !result.hasOwnProperty('SOAP-ENV:Envelope') ) {
+			failure( "Parse error.  Missing " +  'SOAP-ENV:Envelope' );
+			return;
+		}
+		if( !result['SOAP-ENV:Envelope'].hasOwnProperty('SOAP-ENV:Body') ) {
+			failure( "Parse error: Missing " +  'SOAP-ENV:Body' );
+			return;
+		}
+		success( result['SOAP-ENV:Envelope']['SOAP-ENV:Body'] );
+	});
+}
+
+
+exports.updateFirmware = function( camera, filepath, callback ) {
+	(async () => {
+		try {
+			const client = SetupFirmwareUpdate( filepath, camera.user, camera.password);
+			const url = camera.url + '/axis-cgi/firmwaremanagement.cgi';
+			const response = await client.post(url);
+			callback(false, response.body );
+		} catch (error) {
+			console.log(error);
+			callback(true, error );
+		}
+	})();
+}
+
+exports.soap = function( camera, soapBody, callback ) {
+	var soapEnvelope = '<SOAP-ENV:Envelope ' +
+					   'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '+
+					   'xmlns:xsd="http://www.w3.org/2001/XMLSchema" '+
+					   'xmlns:tt="http://www.onvif.org/ver10/schema "'+
+					   'xmlns:tds="http://www.onvif.org/ver10/device/wsdl" '+
+					   'xmlns:tev="http://www.onvif.org/ver10/event/wsdl" '+
+					   'xmlns:tns1="http://www.onvif.org/ver10/topics" ' +
+	                   'xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" '+
+					   'xmlns:acertificates="http://www.axis.com/vapix/ws/certificates" '+
+					   'xmlns:acert="http://www.axis.com/vapix/ws/cert" '+
+					   'xmlns:aev="http://www.axis.com/vapix/ws/event1" ' +
+					   'xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">';
+					   
+	soapEnvelope += '<SOAP-ENV:Body>' + soapBody + '</SOAP-ENV:Body>';
+	soapEnvelope += '</SOAP-ENV:Envelope>';
+	exports.postBody( camera, '/vapix/services', soapEnvelope, function( error, response) {
+		if( error ) {
+			callback( true, response );
+			return;
+		}
+		parseSOAPResponse( response,
+			function(result){ //success
+				callback(false,result);
+			},
+			function(result) {
+				callback(true,result);
+			}
+		)
+	});
+}
+
+exports.infoCertificate = function( camera, certificateID, callback ) {
+	var soapBody = '<tds:GetCertificateInformation xmlns="http://www.onvif.org/ver10/device/wsdl">';
+	soapBody += '<CertificateID>' + certificateID + '</CertificateID>';
+	soapBody += '</tds:GetCertificateInformation>';
+	
+	exports.soap( camera, soapBody, function( error, response ) {
+		if( error ) {
+			console.log("infoCertificate:",response);
+			callback( true, response);
+			return;
+		}
+		var data = response['tds:GetCertificateInformationResponse']['tds:CertificateInformation'];
+		var cert = {
+			id: data['tt:CertificateID'],
+			issuer: data['tt:IssuerDN'],
+			subject: data['tt:SubjectDN'],
+			validFrom: data['tt:Validity']['tt:From'],
+			validTo: data['tt:Validity']['tt:Until'],
+			keylength: data['tt:KeyLength'],
+			serialnumber: data['tt:SerialNum'],
+			certPEM: data['tt:Extension']['acert:CertificateInformationExtension']['acert:CertificatePEM']
+		}
+		callback( false, cert );
+	});
+};
 
 exports.listCertificates = function( camera, callback ) {
 	var soapBody = '<tds:GetCertificates xmlns="http://www.onvif.org/ver10/device/wsdl"></tds:GetCertificates>';
 	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
-			callback( true, "Request error: " + body);
+			callback( true,response);
 			return;
 		}
 		if( response.hasOwnProperty('tds:GetCertificatesResponse') && response['tds:GetCertificatesResponse'].hasOwnProperty('tds:NvtCertificate')) {
@@ -498,22 +892,24 @@ exports.listCertificates = function( camera, callback ) {
 				certs = NvtCertificate;
 			else
 				certs.push(NvtCertificate);
-			
-			list = [];
-			certs.forEach( function(cert) {
-				var pemData = cert['tt:Certificate']['tt:Data'];
-				var rows = pemData.match(/.{1,64}/g);
-				var pem = '----BEGIN CERTIFICATE-----\n';
-				rows.forEach(function(row){
-					pem += row + '\n'
-				})
-				pem += '-----END CERTIFICATE-----\n';
-				list.push({
-					id: cert['tt:CertificateID'],
-					pem: pem
+			console.log("Found " + certs.length + " certs");
+			var list = [];
+			if( certs.length === 0 ) {
+				callback( false, list );
+				return;
+			}
+			var certCounter = certs.length;
+			var theCallback = callback;
+			for( var i = 0; i < certs.length; i++ ) {
+				exports.infoCertificate( camera, certs[i]['tt:CertificateID'], function( error, response ) {
+					if( !error )
+						list.push( response );
+
+					certCounter--;
+					if( certCounter <= 0 )
+						theCallback( false, list );
 				});
-			});
-			callback( false, list );
+			};
 			return;
 		}
 		callback(true,"Invalid SOAP response. Missing tds:GetCertificatesResponse");
@@ -532,14 +928,18 @@ exports.createCertificate = function( camera, id, certificate, callback ) {
 	var soapBody = '<acertificates:CreateCertificate2 xmlns="http://www.axis.com/vapix/ws/certificates">';
 	soapBody += '<acertificates:Id>' + id + '</acertificates:Id> <acertificates:Subject>';
 	soapBody +=	'<acert:CN>' + certificate.commonName + '</acert:CN>';
-	if( certificate.hasOwnProperty('country')) soapBody += '<acert:C>' + certificate.country + '</acert:C>';
-	if( certificate.hasOwnProperty('organizationName')) soapBody += '<acert:O>' + certificate.organizationName + '</acert:O>';
-	if( certificate.hasOwnProperty('organizationalUnitName')) soapBody += '<acert:OU>' + certificate.organizationalUnitName + '</acert:OU>';
-	if( certificate.hasOwnProperty('stateOrProvinceName')) soapBody += '<acert:ST>' + certificate.stateOrProvinceName + '</acert:ST>';
+	if( certificate.hasOwnProperty('country'))
+		soapBody += '<acert:C>' + certificate.country + '</acert:C>';
+	if( certificate.hasOwnProperty('organizationName'))
+		soapBody += '<acert:O>' + certificate.organizationName + '</acert:O>';
+	if( certificate.hasOwnProperty('organizationalUnitName'))
+		soapBody += '<acert:OU>' + certificate.organizationalUnitName + '</acert:OU>';
+	if( certificate.hasOwnProperty('stateOrProvinceName'))
+		soapBody += '<acert:ST>' + certificate.stateOrProvinceName + '</acert:ST>';
 	soapBody +=	'</acertificates:Subject></acertificates:CreateCertificate2>';
 	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
-			callback( true, "Request error: " + body);
+			callback( true, response);
 			return;
 		}
 		if( response.hasOwnProperty('acertificates:CreateCertificate2Response') && response['acertificates:CreateCertificate2Response'].hasOwnProperty('acertificates:Certificate') ) {
@@ -576,7 +976,7 @@ exports.requestCSR = function( camera, id, certificate, callback ) {
 	soapBody +=	'</acertificates:Subject></acertificates:Subject></acertificates:GetPkcs10Request2>';
 	exports.soap( camera, soapBody, function( error, response ) {
 		if( error ) {
-			callback( true, "Request error: " + body);
+			callback( true, response);
 			return;
 		}
 		if( response.hasOwnProperty('acertificates:GetPkcs10Request2Response') && response['acertificates:GetPkcs10Request2Response'].hasOwnProperty('acertificates:Pkcs10Request') ) {
@@ -594,34 +994,11 @@ exports.requestCSR = function( camera, id, certificate, callback ) {
 	});
 }
 
-function parseSOAPResponse( xml, success, failure ) {
-	var parser = new xml2js.Parser({
-		explicitArray: false,
-		mergeAttrs: true
-	});
-
-	parser.parseString(xml, function (err, result) {
-		if( err ) {
-			failure( err );
-			return;
-		}
-		if( !result.hasOwnProperty('SOAP-ENV:Envelope') ) {
-			failure( "Parse error.  Missing " +  'SOAP-ENV:Envelope' );
-			return;
-		}
-		if( !result['SOAP-ENV:Envelope'].hasOwnProperty('SOAP-ENV:Body') ) {
-			failure( "Parse error: Missing " +  'SOAP-ENV:Body' );
-			return;
-		}
-		success( result['SOAP-ENV:Envelope']['SOAP-ENV:Body'] );
-	});
-}
-
 exports.listEvents = function( camera, callback ) {
 	var soapBody = '<aev:GetEventInstances xmlns="http://www.axis.com/vapix/ws/event1"></aev:GetEventInstances>';
 	exports.soap( camera, soapBody, function(error, response ) {
 		if( error ) {
-			callback( true, "Request error: " + body);
+			callback( true, response);
 			return;
 		}
 		if( !response.hasOwnProperty('aev:GetEventInstancesResponse') ) {

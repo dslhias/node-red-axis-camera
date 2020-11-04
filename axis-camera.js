@@ -1,4 +1,3 @@
-var request = require('request');
 var vapix = require('./vapix.js');
 
 module.exports = function(RED) {
@@ -42,7 +41,6 @@ module.exports = function(RED) {
 			var action = msg.action || node.action;
 			var payload = node.data || msg.payload;
 			msg.error = false;
-			
 			switch( action ) {
 				case "Info":
 					msg.error = false;
@@ -190,69 +188,63 @@ module.exports = function(RED) {
 						}
 						msg.error = false;
 						msg.payload = response;
+						console.log("Image format = " + format );
 						if( format === "base64" )
 							msg.payload = response.toString('base64');
 						node.send(msg);
 					});
 				break;
-				
-				case "HTTP GET":
-					var options = {url: camera.url + payload, strictSSL: false}
-					if( format === "binary" || format === "base64" )
-						options.encoding = null;
-					request.get(options, function (error, response, body) {
-						if( error ) {msg.error = true;msg.payload = response?response.toString():"No response";node.send(msg);return;}
-						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-						msg.payload = body;
-						if( format === "base64")
-							msg.payload = body.toString('base64');
-						if( format === "json" ) {
-							msg.payload = JSON.parse(body);
-							if( !msg.payload ) {msg.error = true;msg.payload = "Error parsing response as JSON";}
-						}
-						node.send(msg);
-					}).auth( camera.user, camera.password, false);
-				break;
 
-				case "HTTP POST":
-					if( !msg.url || msg.url.length < 5 ){msg.error=true;msg.payload = "Invalid msg.url";node.send(msg);return;}
-					var options = {url: camera.url + msg.url, body: msg.payload, strictSSL: false}
-					
-					if( typeof msg.payload === 'object' ) {
-						options.headers = {'Content-Type': 'application/json'};
-						options.body = JSON.stringify(msg.payload);
-					}
-					
-					if( format === "binary" || format === "base64" )
-						options.encoding = null;
-					
-					request.post(options, function (error, response, body) {
-						msg.error = false;
+				case "HTTP GET":
+					vapix.get( camera, payload, function( error, body ) {
+						msg.payload = body;
 						if( error ) {
 							msg.error = true;
-							msg.payload = response?response.toString():"No response";
-							node.send(msg);return;
-						}
-						if( response.statusCode !== 200 ) {
-							msg.error=true;
-							msg.payload = body.toString();
 							node.send(msg);
 							return;
 						}
-						msg.payload = body;
-						if( format === "base64")
+
+						if( format === "base64" )
 							msg.payload = body.toString('base64');
-						if( format === "json" ) {
+						if( format === "json" )
 							msg.payload = JSON.parse(body);
-							if( !msg.payload ) {msg.error = true;msg.payload = "Error parsing response as JSON";}
+
+						node.send(msg);
+					});
+				break;
+
+				case "HTTP POST":
+					if( !msg.url || msg.url.length < 5 ) {
+						msg.error=true;
+						msg.payload = "Invalid msg.url";
+						node.send(msg);
+						return;
+					}
+					if( format === "json" ) {
+						vapix.postJSON( camera, msg.url, payload, function( error, body ) {
+							msg.payload = body;
+							if( error ) {
+								msg.error = true;
+								node.send(msg);
+								return;
+							}
+							node.send(msg);
+						});
+						return;
+					} 
+					vapix.postBody( camera, msg.url, payload, function( error, body ) {
+						msg.payload = body;
+						if( error ) {
+							msg.error = true;
+							node.send(msg);
+							return;
 						}
 						node.send(msg);
-					}).auth( camera.user, camera.password, false);
+					});
 				break;
 					
 				case "Get Properties":
 					vapix.getParam( camera, payload, function( error, response ) {
-						msg.error = false;
 						msg.payload = response?response:"No response";
 						if( error )
 							msg.error = true;
@@ -262,7 +254,6 @@ module.exports = function(RED) {
 				
 				case "Set Properties":
 					vapix.setParam( camera, msg.topic, payload, function(error, response ){
-						msg.error = false;
 						msg.payload = response?response:"No response";
 						if( error )
 							msg.error = true;
@@ -272,8 +263,7 @@ module.exports = function(RED) {
 				
 				case "List Accounts":
 					vapix.listAccounts( camera, function(error, response ) {
-						msg.payload = response?response:"No response";
-						msg.error = false;
+						msg.payload = response;
 						if( error )
 							msg.error = true;
 						node.send( msg );
@@ -281,302 +271,61 @@ module.exports = function(RED) {
 				break;
 
 				case "Set Account":
-					vapix.setAccount( camera, payload, function(error,response) {
-						msg.error = false;
-						msg.payload = response?response:"No response";
+					vapix.setAccount( camera, payload, function(error, response) {
+						msg.payload = response;
 						if( error )
-							msg.error = error;
+							msg.error = true;
+						node.send( msg );
+					});
+				break;
+				
+				case "Remove Account":
+					vapix.removeAccount( camera, payload, function(error, response) {
+						msg.payload = response;
+						if( error )
+							msg.error = true;
 						node.send( msg );
 					});
 				break;
 
-				case "MQTT Client":
-					var options = {
-						headers: {'Content-Type': 'application/json'},
-						strictSSL: false,
-						url: camera.url + "/axis-cgi/mqtt/client.cgi",
-						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "getClientStatus"})
-					};
-					request.post(options, function (error, response, body) {
-						if( error ) {msg.error = true;msg.payload = response?response.toString():"No response";node.send(msg);return;}
-						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-						var client = JSON.parse(body).data;
-//						console.log(client.config.lastWillTestament);
-						msg.payload = {
-							active: client.status.state === "active",
-							status: client.status.connectionStatus, //connected, connecting, failed, disconnected
-							connected: client.status.connectionStatus === "connected",
-							host: client.config.server.host,
-							port: client.config.server.port.toString(),
-							id: client.config.clientId,
-							tls: client.config.server.protocol === "ssl",
-							validateCertificate: client.config.ssl.validateServerCert,
-							user: client.config.username,
-							password: '********',
-							lastWillTestament: null,
-							announcement: null
-						}
-						if( client.config.hasOwnProperty("lastWillTestament") ) {
-							if( client.config.lastWillTestament.useDefault ) {
-								msg.payload.lastWillTestament = {
-									topic: "default",
-									payload: "default"
-								}
-							} else {
-								msg.payload.lastWillTestament = {
-									topic: client.config.lastWillTestament.topic,
-									payload: JSON.parse(client.config.lastWillTestament.message)
-								}
-							}
-						}
-						if( client.config.hasOwnProperty("connectMessage") ) {
-							if( client.config.connectMessage.useDefault ) {
-								msg.payload.announcement = {
-									topic: "default",
-									payload: "default"
-								}
-							} else {
-								msg.payload.announcement = {
-									topic: client.config.connectMessage.topic,
-									payload: JSON.parse(client.config.connectMessage.message)
-								}
-							}
-						}
-//						console.log(msg.payload);
-						node.send(msg);
-					}).auth( camera.user, camera.password, false);
+				case "MQTT Status": 
+					vapix.mqttClientStatus( camera, function(error, response) {
+						msg.payload = response;
+						if( error )
+							msg.error = true;
+						node.send( msg );
+					});
 				break;
 				
 				case "MQTT Connect":
-					var options = {}
-					var connect = true;
-					var settings = msg.payload;
-					if( settings === null || settings === false ) {  //Disconnect request
-						options = {
-							headers: {'Content-Type': 'application/json'},
-							strictSSL: false,
-							url: camera.url + "/axis-cgi/mqtt/client.cgi",
-							body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "deactivateClient"})
-						};
-						request.post(options, function (error, response, body) {
-							if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
-							if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-							msg.payload = "Disconnecting";
-							node.send(msg);
-						}).auth( camera.user, camera.password, false);
-						return;
-					}
-					
-					var user = "";
-					var password = "";
-					var tls = false;
-					var validateCertificate = false;
-					
-					if( !settings.hasOwnProperty("host") || settings.host.length === 0 ) {
-						msg.error = true;
-						msg.payload = "Host needs to be set";
-						node.send(msg);
-						return;
-					}
-					if( !settings.hasOwnProperty("port") || settings.port.length === 0 ) {
-						msg.error = true;
-						msg.payload = "Port needs to be set";
-						node.send(msg);
-						return;
-					}
-					
-					if( !settings.hasOwnProperty("id") || settings.id.length === 0 ) {
-						msg.error = true;
-						msg.payload = "Client id needs to be set";
-						node.send(msg);
-						return;
-					}
-
-					if( settings.hasOwnProperty("tls") )
-						tls = settings.tls;
-
-					if( settings.hasOwnProperty("validateCertificate")  )
-						validateCertificate = settings.validateCertificate;
-
-					var params = {
-							activateOnReboot: true,
-							server: {
-								protocol: tls?"ssl":"tcp",
-								host: settings.host,
-								port: parseInt(settings.port),
-						//      "basepath":"url-extension"
-							},
-							ssl: {
-								validateServerCert: validateCertificate
-							},
-							username: settings.user || "",
-							password: settings.password || "",
-							clientId: settings.id,
-							keepAliveInterval: 60,
-							connectTimeout: 60,	
-							cleanSession: true,
-							autoReconnect: true
-					}
-					
-					if( settings.hasOwnProperty("lastWillTestament") && settings.lastWillTestament !== null && settings.lastWillTestament !== false ) {
-						params.lastWillTestament = {
-							useDefault: false,
-							topic: settings.lastWillTestament.topic,
-							message: settings.lastWillTestament.payload,
-							retain: true,
-							qos: 1							
-						}
-						//console.log(settings.lastWillTestament.payload);
-						if( typeof settings.lastWillTestament.payload === 'object' )
-							params.lastWillTestament.message = JSON.stringify(settings.lastWillTestament.payload);
-						params.disconnectMessage = JSON.parse(JSON.stringify(params.lastWillTestament));
-					}
-					if( settings.hasOwnProperty("announcement") && settings.announcement !== null && settings.announcement !== false ) {
-						params.connectMessage = {
-							useDefault: false,
-							topic: settings.announcement.topic,
-							message: settings.announcement.payload,
-							retain: true,
-							qos: 1							
-						}
-						if( typeof settings.announcement.payload === 'object' )
-							params.connectMessage.message = JSON.stringify(settings.announcement.payload);
-					}
-					//console.log(params);
-					var options = {
-						headers: {'Content-Type': 'application/json'},
-						strictSSL: false,
-						url: camera.url + "/axis-cgi/mqtt/client.cgi",
-						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "configureClient",params: params})
-					};
-					request.post(options, function (error, response, body) {
-						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
-						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-						options = {
-							headers: {'Content-Type': 'application/json'},
-							strictSSL: false,
-							url: camera.url + "/axis-cgi/mqtt/client.cgi",
-							body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "activateClient"})
-						};
-						request.post(options, function (error, response, body) {
-							if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
-							if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-							msg.payload = "Connecting";
-							node.send(msg);
-						}).auth( camera.user, camera.password, false);
-					}).auth( camera.user, camera.password, false);
+					vapix.mqttConnect( camera, payload, function(error, response) {
+						msg.payload = response;
+						if( error )
+							msg.error = true;
+						node.send( msg );
+					});
 				break;
 				
 				case "Get MQTT Publish":
-					var options = {
-						headers: {'Content-Type': 'application/json'},
-						strictSSL: false,
-						url: camera.url + "/axis-cgi/mqtt/event.cgi",
-						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "getEventPublicationConfig"})
-					};
-					request.post(options, function (error, response, body) {
-						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
-						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-						data = JSON.parse(body).data.eventPublicationConfig;
-						//console.log(data);
-						msg.payload = {
-							topic: data.customTopicPrefix,
-							onvif: data.appendEventTopic,
-							events: []
-						}
-						for( var i = 0; i < data.eventFilterList.length; i++ )
-							msg.payload.events.push(data.eventFilterList[i].topicFilter);
-						node.send(msg);
-					}).auth( camera.user, camera.password, false);
+					vapix.mqttGetPublishing( camera, function(error, response) {
+						msg.payload = response;
+						if( error )
+							msg.error = true;
+						node.send( msg );
+					});
 				break;
 				
 				case "Set MQTT Publish":
-					var settings = msg.payload;
-					if( !settings.hasOwnProperty("topic") ) {
-						msg.error = true;
-						msg.payload = "Topic needs to be set";
-						node.send(msg);
-						return;
-					}
-					if( !settings.hasOwnProperty("events") ) {
-						msg.error = true;
-						msg.payload = "Events needs to be set";
-						node.send(msg);
-						return;
-					}
-					if( !Array.isArray(settings.events) )
-						settings.events = [];
-					var list = [];
-					for( var i = 0; i < settings.events.length; i++ ) {
-						list.push( {
-							topicFilter: settings.events[i],
-							qos: 0,
-							retain: "none"
-						});
-					}
-					params = {
-						eventFilterList:list,
-						topicPrefix: "custom",
-						customTopicPrefix: settings.topic,
-						appendEventTopic: settings.onvif || false,
-						includeTopicNamespaces : false,
-						includeSerialNumberInPayload: true
-					};
-					var options = {
-						headers: {'Content-Type': 'application/json'},
-						strictSSL: false,
-						url: camera.url + "/axis-cgi/mqtt/event.cgi",
-						body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "configureEventPublication",params:params})
-					};
-					request.post(options, function (error, response, body) {
-						if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
-						if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-						msg.payload = "OK";
-						node.send(msg);
-					}).auth( camera.user, camera.password, false);
-				break;
-
-				case "List Connections":
-					vapix.request( camera, '/axis-cgi/admin/connection_list.cgi?action=get', function(error,response ) {
-						msg.error = false;
-						if( error ) {msg.error = true;msg.payload = response;node.send(msg);return;}
-						var rows = response.split('\n');
-						var list = [];
-						for( var i = 1; i < rows.length; i++) {
-							var row = rows[i].trim();
-							row = row.replace(/\s{2,}/g, ' ');
-							if( row.length > 10 ) {
-								var items = row.split(' ');
-								var ip = items[0].split('.');
-								if( ip != '127' ) {
-									list.push({
-										address: items[0],
-										protocol: items[1],
-										port: items[2],
-										service: items[3].split('/')[1]
-									})
-								}
-							}
-						}
-						msg.payload = list;
-						node.send(msg);
-					});
-				break;
-				
-				case 'List Events':
-					vapix.listEvents( camera, function( error, response ) {
+					vapix.mqttSetPublishing( camera, payload, function(error, response) {
 						msg.payload = response;
-						msg.error = false;
 						if( error )
 							msg.error = true;
-						node.send(msg);
+						node.send( msg );
 					});
 				break;
-				
+
 				case 'List ACAP':
-					console.log("List ACAP");
 					vapix.listACAP( camera, function(error, response ) {
-						msg.error = false;
 						msg.payload = response;
 						if( error )
 							msg.error = true;
@@ -587,7 +336,6 @@ module.exports = function(RED) {
 				case 'Start ACAP':
 					vapix.controlACAP( camera, "start", payload,  function(error, response ) {
 						msg.payload = response;
-						msg.error = false;
 						if( error )
 							msg.error = true;
 						node.send( msg );
@@ -605,7 +353,6 @@ module.exports = function(RED) {
 					
 				case 'Remove ACAP':
 					vapix.controlACAP( camera, "remove", payload,  function(error, response ) {
-						msg.payload = response;
 						msg.payload = response;
 						msg.error = false;
 						if( error )
@@ -629,64 +376,84 @@ module.exports = function(RED) {
 					});
 				break;
 
-				case 'Firmware Update':
-					node.status({fill:"blue",shape:"dot",text:"Updating..."});
-					vapix.updateFimrware( camera , payload, function(error, response ) {
-						payload = response;
-						msg.error = false;
-						if( error ) {
-							node.status({fill:"red",shape:"dot",text:"Failed"});
-							msg.error = true;
-						} else {
-							node.status({fill:"green",shape:"dot",text:"Success"});
-						}
+				case "List Connections":
+					vapix.listConnections( camera, function(error, response ) {
+						msg.payload = response;
+						if( error )	msg.error = true;
 						node.send( msg );
 					});
 				break;
-			
+
+				case "Restart":
+					vapix.restart( camera, function(error, response ) {
+						msg.payload = response;
+						if( error )	msg.error = true;
+						node.send( msg );
+					});
+				break;
+
 				case "List Certificates":
 					vapix.listCertificates( camera, function(error, response ) {
-						msg.error = false;
 						msg.payload = response
-						if( error )
-							msg.error = true;
+						if( error )	msg.error = true;
 						node.send(msg);
 					});
 				break;
 				
 				case "Create Certificate":
+					node.status({fill:"blue",shape:"dot",text:"Generating key..."});
 					vapix.createCertificate( camera, msg.topic, payload, function(error, response) {
-						msg.error = false;
-						if( error )
+						if( error ){
+							node.status({fill:"red",shape:"dot",text:"Failed"});
 							msg.error = true;
+						} else {
+							node.status({fill:"green",shape:"dot",text:"Success"});
+						}
 						msg.payload = response;
 						node.send(msg);
 					});
 				break;
 				
 				case "Request CSR":
+					node.status({fill:"blue",shape:"dot",text:"Generating key..."});
 					vapix.requestCSR( camera, msg.topic, payload, function(error, response) {
 						msg.error = false;
-						if( error )
+						if( error ){
+							node.status({fill:"red",shape:"dot",text:"Failed"});
 							msg.error = true;
+						} else {
+							node.status({fill:"green",shape:"dot",text:"Success"});
+						}
 						msg.payload = response;
 						node.send(msg);
 					});
 				break;
-				
-				case "Restart":
-					vapix.request(camera, '/axis-cgi/restart.cgi', function(error,response ) {
-						if( error )
-							msg.error = true;
-						else	
-							msg.error = false;
+
+				case 'Firmware Update':
+					node.status({fill:"blue",shape:"dot",text:"Updating..."});
+					vapix.updateFirmware( camera , payload, function(error, response ) {
 						msg.payload = response;
-						node.send(msg);
+						msg.error = false;
+						if( error ) {
+							node.status({fill:"red",shape:"dot",text:"Failed"});
+							msg.error = true;
+						} else {
+							msg.payload = JSON.parse(msg.payload);
+							if( msg.payload.hasOwnProperty("error") ) {
+								msg.error = true;
+								node.status({fill:"red",shape:"dot",text:"Failed"});
+								msg.payload = msg.payload.error;
+							} else {
+								msg.payload = msg.payload.data;
+								node.status({fill:"green",shape:"dot",text:"Success"});
+							}
+						}
+						node.send( msg );
 					});
 				break;
 				
 				case "Remote Syslog":
-					vapix.request(camera,'/axis-cgi/param.cgi?action=update&root.system.editcgi=yes', function(error,response ) {
+					vapix.get(camera,'/axis-cgi/param.cgi?action=update&root.system.editcgi=yes', function(error,response ) {
 						if( error ) {msg.error = true;node.send(response);return;}
 						if( response.search("Error") >= 0 || response.search("DOCTYPE") >= 0 ) {
 							msg.error = true;
@@ -739,8 +506,18 @@ module.exports = function(RED) {
 							msg.error = false;
 							msg.payload = "OK";
 							node.send(msg);
-							vapix.request(camera, '/axis-cgi/param.cgi?action=update&root.system.editcgi=no', function(error,response ) {});
+							vapix.get(camera, '/axis-cgi/param.cgi?action=update&root.system.editcgi=no', function(error,response ) {});
 						});
+					});
+				break;
+				
+				case 'List Events':
+					vapix.listEvents( camera, function( error, response ) {
+						msg.payload = response;
+						msg.error = false;
+						if( error )
+							msg.error = true;
+						node.send(msg);
 					});
 				break;
 				

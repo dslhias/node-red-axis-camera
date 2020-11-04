@@ -14,6 +14,11 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 
 ## Changelog
 
+### Version 1.5.0
+* Firmware and ACAP installation is now working as expected
+* Added examples flows
+* Refactoring due to replacing dependency from request to got
+
 ### Version 1.3.2
 * Fixed a bug in action MQTT Connect that prevented CA certificate validation.
 * Fixed a bug in MQTT Client where property connected was always false while connected.
