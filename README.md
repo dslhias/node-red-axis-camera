@@ -14,7 +14,7 @@ An Axis Camera administration node that simplifies the most common VAPIX and SOA
 
 ## Changelog
 
-### Version 1.5.0
+### Version 1.5.1
 * Firmware and ACAP installation is now working as expected
 * Added examples flows
 * Refactoring due to replacing dependency from request to got

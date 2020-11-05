@@ -478,7 +478,6 @@ exports.mqttConnect = function( camera, settings, callback ) {
 	);
 }
 
-
 exports.mqttGetPublishing = function( camera, callback ) {
 	exports.postJSON( camera, "/axis-cgi/mqtt/event.cgi",
 		{
@@ -491,29 +490,24 @@ exports.mqttGetPublishing = function( camera, callback ) {
 				callback( true, response );
 				return;
 			}
+			var events = response.data.eventPublicationConfig.eventFilterList;
+			var list = [];
+			events.forEach( function( onvifEvent ) {
+				list.push({
+					event: onvifEvent.topicFilter,
+					retain: (onvifEvent.reatin === "property" || onvifEvent.reatin === "all")?true:false
+				});
+			});
+
+			var data = response.data.eventPublicationConfig;
 			var processedResponse = {
-				topic: response.customTopicPrefix,
-				onvif: response.appendEventTopic,
-				events: []
+				topic: data.customTopicPrefix,
+				onvif: data.appendEventTopic,
+				events: list
 			}
-			for( var i = 0; i < response.eventFilterList.length; i++ )
-				msg.payload.events.push(data.eventFilterList[i].topicFilter);
-			callback( false, response);
+			callback( false, processedResponse);
 		}
 	);
-	
-	
-	var options = {
-		headers: {'Content-Type': 'application/json'},
-		strictSSL: false,
-		url: camera.url + "/axis-cgi/mqtt/event.cgi",
-		body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "getEventPublicationConfig"})
-	};
-	request.post(options, function (error, response, body) {
-		if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
-		if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-		node.send(msg);
-	}).auth( camera.user, camera.password, false);
 }
 
 exports.mqttSetPublishing = function( camera, settings, callback ) {
@@ -534,9 +528,9 @@ exports.mqttSetPublishing = function( camera, settings, callback ) {
 	var list = [];
 	for( var i = 0; i < settings.events.length; i++ ) {
 		list.push( {
-			topicFilter: settings.events[i],
+			topicFilter: settings.events[i].event,
 			qos: 0,
-			retain: "none"
+			retain: settings.events[i].retain ? "all":"none"
 		});
 	}
 	params = {
@@ -547,18 +541,23 @@ exports.mqttSetPublishing = function( camera, settings, callback ) {
 		includeTopicNamespaces : false,
 		includeSerialNumberInPayload: true
 	};
-	var options = {
-		headers: {'Content-Type': 'application/json'},
-		strictSSL: false,
-		url: camera.url + "/axis-cgi/mqtt/event.cgi",
-		body: JSON.stringify({apiVersion: "1.0",context: "Node-Red",method: "configureEventPublication",params:params})
-	};
-	request.post(options, function (error, response, body) {
-		if( error ) {msg.error = true;msg.payload = body;node.send(msg);return;}
-		if( response.statusCode !== 200 ) {msg.error=true;msg.payload = body.toString();node.send(msg);return;}
-		msg.payload = "OK";
-		node.send(msg);
-	}).auth( camera.user, camera.password, false);
+	console.log(params);
+	exports.postJSON( camera, "/axis-cgi/mqtt/event.cgi",
+		{
+			apiVersion: "1.0",
+			context: "Node-Red",
+			method: "configureEventPublication",
+			params:params
+		},
+		function(error, response) {
+			if( error ) {
+				callback( true, response );
+				return;
+			}
+			callback( false, "OK" );
+				return;
+		}
+	);
 }
 
 exports.listACAP = function( camera, callback ) {
